@@ -1,0 +1,165 @@
+# ============================================
+# Cockatoo_v1 - Python 3.10.11 requirements file
+# Version: 1.1.0 | Python: 3.10.11
+# ============================================
+
+# CORE DEPENDENCIES (MUST HAVE)
+# ------------------------------
+setuptools==68.2.0
+wheel==0.41.0
+pip==23.0.1
+
+# AI & MACHINE LEARNING CORE
+# --------------------------
+# PyTorch - CPU version for Windows
+torch==2.2.0
+torchvision==0.17.0
+torchaudio==2.2.0
+
+# Transformers ecosystem
+transformers==4.40.0
+sentence-transformers==2.2.2
+accelerate==0.25.0
+tokenizers==0.19.0
+
+# LangChain ecosystem (UPDATED VERSIONS)
+langchain==0.1.20
+langchain-community==0.0.38
+langchain-core==0.1.53
+langchain-text-splitters==0.0.2
+# ngchain-ollama>=0.1.3,<0.2.0
+langchain-chroma==0.1.4
+
+# OpenAI API (optional)
+openai==2.16.0
+
+# Numerical computing
+numpy==1.24.4
+scipy==1.15.3
+scikit-learn==1.3.0
+
+# HuggingFace ecosystem
+huggingface-hub==0.36.0
+datasets==4.5.0
+
+# VECTOR DATABASE & SEARCH
+# ------------------------
+chromadb==0.4.18
+hnswlib==0.7.0
+
+# DOCUMENT PROCESSING
+# -------------------
+# PDF processing
+PyPDF2==3.0.1
+pdfplumber==0.10.2
+pypdf==3.17.0
+
+# Office documents
+python-docx==0.8.11
+openpyxl==3.1.0
+
+# Ebooks
+ebooklib==0.18
+
+# Web content
+beautifulsoup4==4.12.2
+lxml==4.9.0
+html5lib==1.1
+
+# Text processing
+markdown-it-py==3.0.0
+python-frontmatter==1.0.0
+
+# Data processing
+pandas==2.1.0
+
+# Images & text extraction
+Pillow==10.0.0
+markdown==3.5
+chardet==5.2.0
+
+# DESKTOP GUI
+# -----------
+customtkinter==5.2.0
+tkinterweb==4.17.1
+
+# DATABASE & STORAGE
+# ------------------
+sqlalchemy==2.0.0
+alembic==1.13.0
+
+# UTILITIES
+# ---------
+# Configuration
+pyyaml==6.0
+python-dotenv==1.0.0
+
+# Networking
+requests==2.32.5
+aiohttp==3.9.0
+
+# System & monitoring
+psutil==5.9.0
+watchdog==3.0.0
+
+# CLI & output
+click==8.1.0
+rich==13.0.0
+tqdm==4.67.1
+
+# Data serialization
+orjson==3.9.14
+python-multipart==0.0.6
+
+# Security
+cryptography==41.0.0
+
+# Performance
+cachetools==5.3.0
+joblib==1.3.0
+
+# Logging
+structlog==25.5.0
+
+# Typing & validation
+typing-extensions==4.15.0
+jsonschema==4.19.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# WEB FRAMEWORK (Optional)
+# ------------------------
+fastapi==0.104.0
+uvicorn[standard]==0.40.0
+
+# LOCAL LLM (Optional)
+# --------------------
+ollama==0.1.0
+
+# WEB UI (Optional)
+# -----------------
+streamlit==1.28.0
+
+# DEVELOPMENT & TESTING (Optional)
+# --------------------------------
+# Testing
+pytest==7.4.0
+pytest-asyncio==0.23.0
+
+# Code quality
+black==26.1.0
+flake8==7.0.0
+mypy==1.19.1
+
+# Jupyter & interactive
+ipython==8.12.0
+jupyter==1.0.0
+jupyterlab==4.5.3
+
+# PACKAGING
+# ---------
+packaging==23.2
+platformdirs==4.1.0
+pytest-cov==4.0.0
+pytest-mock==3.0.0
+pytesseract==0.3.10

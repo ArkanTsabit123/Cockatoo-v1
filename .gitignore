@@ -1,0 +1,239 @@
+# ============================================
+# COCKATOO V1 GITIGNORE CONFIGURATION
+# ============================================
+
+# Python compilation artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller build artifacts
+*.spec
+.hook-*.py
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Development environment configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.orig
+*.bak
+
+# File patterns for development utilities
+[0-9]*.py
+[0-9]*.md
+[0-9]*.txt
+*complete*tracker*.py
+*complete*structure*.py
+*check_progress.py
+
+# Development file patterns
+*tracker*.py
+*validator*.py
+*check_*.py
+*test-*.py
+*debug-*.py
+*setup_*.py
+*fix*.py
+*.debug.py
+*.test.py
+*test_*.pyc
+
+# Progress tracking files
+.cockatoo_v1_progress*.json
+.Cockatoo_V1_progress*.json
+*.progress.json
+*_progress.json
+smart_validation_report.json
+*system_check*.json
+*check_report*.json
+*progress_summary*.json
+*requirements_analysis*.json
+*dependency_report*.json
+*task_details*.json
+*_report_*.json
+*_report_*.txt
+
+# User-specific configuration overrides
+data/config/*.local.yaml
+data/config/*.local.json
+data/config/user_settings.yaml
+data/config/local_*.yaml
+data/config/local_*.json
+
+# Database storage
+data/database/
+!data/config/
+!data/database/migrations/
+
+# Application logs
+data/logs/
+
+# Document processing directories
+data/documents/uploads/
+data/documents/processed/
+data/documents/thumbnails/
+data/documents/exports/
+
+# Machine learning model storage
+data/models/
+models/
+
+# Vector database storage
+chroma.sqlite3
+chroma/
+
+# System caches
+.cache/
+*.cache
+
+# Temporary working files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Operating system artifacts
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+ehthumbs.db
+Thumbs.db
+
+# Build and distribution outputs
+bin/
+dist/
+build/
+*.exe
+*.msi
+*.dmg
+*.App
+*.app
+AppImage/
+*.deb
+*.rpm
+*.snap
+*.zip
+*.tar.gz
+*.whl
+
+# Sensitive configuration data
+.env
+.env.local
+.env.*.local
+.secrets/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Machine learning model files
+*.bin
+*.pth
+*.pt
+*.h5
+*.onnx
+*.gguf
+*.safetensors
+
+# Web development artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Application framework artifacts
+.streamlit/
+.ollama/
+ollama_models/
+
+# Documentation build outputs
+docs/_build/
+docs/build/
+site/
+
+# Interactive notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Dependency management
+Pipfile.lock
+poetry.lock
+.python-version
+
+# Required files exceptions
+!docs/
+!docs/**/*
+!tests/
+!tests/**/*
+!src/
+!src/**/*.py
+!scripts/
+!scripts/**/*.py
+
+# Configuration templates
+!data/config/app_config.yaml
+!data/config/llm_config.yaml
+!data/config/ui_config.yaml
+!data/config/shortcuts.json
+!data/config/example_config.yaml
+
+# Project files
+!requirements.txt
+!app.py
+!install_cockatoo_v1.py
+!check_server.py
+
+# Database migrations
+alembic.ini
+alembic/
+validation_reports/
+src/database/migrations/
