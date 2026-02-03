@@ -1,0 +1,34 @@
+# Cockatoo_v1 - User Configuration
+# User-specific settings
+
+user:
+  name: "User"
+  email: ""
+  
+preferences:
+  theme: "auto"  # auto, dark, light
+  language: "en"
+  notifications: true
+  auto_save: true
+  auto_backup: true
+  
+document_view:
+  default_view: "grid"  # grid, list
+  sort_by: "date"  # name, date, size, type
+  sort_order: "desc"  # asc, desc
+  show_thumbnails: true
+  
+ai_preferences:
+  default_model: "llama2:7b"
+  response_length: "medium"  # short, medium, long
+  include_sources: true
+  show_confidence: true
+  
+shortcuts:
+  new_conversation: "Ctrl+N"
+  open_document: "Ctrl+O"
+  save_conversation: "Ctrl+S"
+  export_conversation: "Ctrl+E"
+  search_documents: "Ctrl+F"
+  
+# Last updated: 2026-02-03 22:21:46.874796

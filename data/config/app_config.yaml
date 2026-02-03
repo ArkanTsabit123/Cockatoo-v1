@@ -1,0 +1,421 @@
+# cockatoo_v1/data/config/app_config.yaml
+
+# cockatoo_v1 Application Configuration
+# Version: 1.0.0
+# Complete configuration for the cockatoo_v1 personal knowledge assistant
+
+# Application Metadata
+app:
+  name: "cockatoo_v1"
+  version: "1.0.0"
+  author: "cockatoo_v1 Development Team"
+  license: "MIT"
+  environment: "production"
+
+# Directory Structure
+paths:
+  data_dir: "${HOME}/.cockatoo_v1"
+  models_dir: "${data_dir}/models"
+  documents_dir: "${data_dir}/documents"
+  database_dir: "${data_dir}/database"
+  logs_dir: "${data_dir}/logs"
+  exports_dir: "${data_dir}/exports"
+  temp_dir: "${data_dir}/temp"
+  config_dir: "${data_dir}/config"
+  backups_dir: "${data_dir}/backups"
+  plugins_dir: "${data_dir}/plugins"
+
+# Document Processing Configuration
+document_processing:
+  chunking:
+    chunk_size: 500
+    chunk_overlap: 50
+    max_chunk_size: 1000
+    min_chunk_size: 50
+  
+  file_handling:
+    max_file_size_mb: 100
+    max_daily_uploads: 100
+    auto_process_on_upload: true
+    keep_original_files: true
+  
+  supported_formats:
+    - ".pdf"
+    - ".docx"
+    - ".txt"
+    - ".epub"
+    - ".md"
+    - ".html"
+    - ".csv"
+    - ".jpg"
+    - ".png"
+    - ".jpeg"
+  
+  ocr:
+    enabled: true
+    languages:
+      - "eng"
+      - "ind"
+    confidence_threshold: 0.7
+  
+  text_processing:
+    remove_stop_words: true
+    normalize_whitespace: true
+    preserve_formatting: false
+    language_detection: true
+    extract_metadata: true
+
+# Artificial Intelligence Configuration
+ai:
+  # Large Language Model Configuration
+  llm:
+    provider: "ollama"
+    model: "llama2:7b"
+    model_path: "${models_dir}/llama2-7b"
+    
+    generation_parameters:
+      temperature: 0.7
+      top_p: 0.9
+      top_k: 40
+      max_tokens: 2048
+      context_window: 4096
+      repetition_penalty: 1.1
+      frequency_penalty: 0.0
+      presence_penalty: 0.0
+    
+    system_parameters:
+      timeout_seconds: 300
+      retry_attempts: 3
+      streaming_enabled: true
+      cache_responses: true
+      batch_size: 1
+    
+    performance_settings:
+      num_gpu_layers: 0
+      use_mmap: true
+      use_mlock: false
+      n_threads: 4
+    
+    prompts:
+      system_prompt: "You are cockatoo_v1, a helpful AI assistant that answers questions based on the provided documents. Always cite your sources when referencing document content."
+      user_prompt_template: "Context: {context}\n\nQuestion: {question}\n\nAnswer:"
+  
+  # Alternative LLM Models
+  alternative_models:
+    - name: "mistral:7b"
+      provider: "ollama"
+      temperature: 0.7
+      max_tokens: 2048
+    - name: "neural-chat:7b"
+      provider: "ollama"
+      temperature: 0.5
+      max_tokens: 1024
+  
+  # Embedding Model Configuration
+  embeddings:
+    model: "all-MiniLM-L6-v2"
+    dimensions: 384
+    device: "cpu"
+    batch_size: 32
+    normalize_embeddings: true
+    cache_embeddings: true
+    cache_size_mb: 1000
+  
+  # Alternative Embedding Models
+  alternative_embeddings:
+    - name: "all-mpnet-base-v2"
+      dimensions: 768
+    - name: "paraphrase-multilingual-MiniLM-L12-v2"
+      dimensions: 384
+      languages: ["en", "id", "es", "fr", "de", "zh"]
+  
+  # Retrieval Augmented Generation Configuration
+  rag:
+    retrieval:
+      top_k: 5
+      similarity_threshold: 0.7
+      enable_hybrid_search: true
+      max_context_tokens: 3000
+      include_metadata: true
+    
+    search_types:
+      - "semantic"
+      - "keyword"
+      - "hybrid"
+    
+    context_management:
+      chunk_overlap_for_context: 0.2
+      include_neighboring_chunks: true
+      max_sources_per_response: 3
+
+# Database Configuration
+database:
+  sqlite:
+    database_file: "${database_dir}/cockatoo_v1.db"
+    connection_pool_size: 5
+    timeout_seconds: 30
+    journal_mode: "WAL"
+    synchronous: "NORMAL"
+    auto_migrate: true
+    backup_before_migration: true
+  
+  chromadb:
+    persist_directory: "${database_dir}/chroma"
+    collection_name: "documents"
+    embedding_function: "default"
+    anonymized_telemetry: false
+    create_collection_if_not_exists: true
+    metadata_handling: "include"
+    distance_function: "cosine"
+  
+  performance:
+    optimize_on_startup: true
+    vacuum_on_exit: false
+    connection_timeout: 10
+
+# User Interface Configuration
+ui:
+  appearance:
+    theme: "dark"
+    color_scheme: "blue"
+    language: "en"
+    font_family: "Segoe UI"
+    font_size: 12
+    scaling_factor: 1.0
+  
+  features:
+    enable_animations: true
+    smooth_scrolling: true
+    auto_save_interval: 60
+    confirm_on_exit: true
+    show_welcome_screen: true
+  
+  layout:
+    default_window_width: 1200
+    default_window_height: 800
+    sidebar_width: 300
+    chat_panel_width: 500
+    preview_panel_width: 400
+  
+  document_viewer:
+    show_line_numbers: true
+    wrap_text: true
+    highlight_active_line: true
+    show_metadata_panel: true
+  
+  chat_interface:
+    show_typing_indicator: true
+    markdown_rendering: true
+    syntax_highlighting: true
+    auto_scroll_to_bottom: true
+
+# Storage Management
+storage:
+  limits:
+    max_documents: 10000
+    max_conversations: 1000
+    max_document_size_mb: 50
+    max_total_storage_gb: 100
+  
+  cleanup:
+    auto_cleanup_days: 90
+    cleanup_unprocessed_days: 7
+    cleanup_temp_files_hours: 24
+  
+  backup:
+    enabled: true
+    interval_hours: 24
+    retention_days: 30
+    location: "${backups_dir}"
+  
+  security:
+    encryption_enabled: false
+    encrypt_sensitive_data: true
+    secure_delete: false
+  
+  cache:
+    max_cache_size_mb: 1000
+    cache_cleanup_interval_hours: 12
+
+# Performance Configuration
+performance:
+  resources:
+    max_workers: 4
+    max_memory_mb: 4096
+    cpu_threads: 0
+  
+  caching:
+    enabled: true
+    cache_size_mb: 500
+    cache_ttl_hours: 24
+    preload_frequent_documents: true
+  
+  optimization:
+    lazy_loading: true
+    batch_processing: true
+    background_indexing: true
+    incremental_updates: true
+  
+  monitoring:
+    enable_monitoring: true
+    metrics_collection: true
+    performance_logging: true
+    resource_usage_alerts: true
+  
+  threading:
+    io_threads: 2
+    compute_threads: 2
+    database_threads: 2
+
+# Privacy and Security
+privacy:
+  data_collection:
+    telemetry: false
+    crash_reports: false
+    usage_statistics: false
+    anonymous_feedback: false
+  
+  network:
+    auto_update_check: false
+    check_for_updates: false
+    allow_external_connections: false
+  
+  local_data:
+    store_search_history: true
+    store_conversation_history: true
+    encrypt_local_data: false
+    clear_cache_on_exit: false
+  
+  privacy_features:
+    anonymize_filenames: false
+    remove_metadata_on_export: false
+    secure_delete_method: "simple"
+
+# Logging Configuration
+logging:
+  levels:
+    console_level: "INFO"
+    file_level: "DEBUG"
+    database_level: "WARNING"
+  
+  files:
+    app_log_file: "${logs_dir}/app.log"
+    error_log_file: "${logs_dir}/error.log"
+    access_log_file: "${logs_dir}/access.log"
+    performance_log_file: "${logs_dir}/performance.log"
+  
+  rotation:
+    max_log_size_mb: 10
+    backup_count: 5
+    compress_old_logs: true
+  
+  format:
+    log_format: "json"
+    include_timestamp: true
+    include_process_id: true
+    include_thread_id: true
+  
+  components:
+    log_document_processing: true
+    log_ai_requests: true
+    log_database_queries: false
+    log_ui_events: false
+
+# Advanced Features
+advanced:
+  plugins:
+    enabled: true
+    plugin_directory: "${plugins_dir}"
+    auto_load_plugins: true
+    plugin_sandbox: true
+  
+  experimental:
+    experimental_features: false
+    enable_beta_features: false
+  
+  developer:
+    developer_mode: false
+    debug_logging: false
+    show_internal_errors: false
+  
+  customization:
+    allow_custom_themes: true
+    allow_keyboard_shortcuts: true
+    allow_scripting: false
+  
+  processing:
+    enable_preprocessing_pipeline: true
+    enable_postprocessing_pipeline: true
+    parallel_processing: true
+
+# Export Configuration
+export:
+  formats:
+    supported_export_formats:
+      - "markdown"
+      - "pdf"
+      - "html"
+      - "txt"
+      - "json"
+    default_export_format: "markdown"
+  
+  settings:
+    include_timestamps: true
+    include_metadata: true
+    compress_exports: false
+    export_quality: "high"
+    include_images: true
+    preserve_formatting: true
+  
+  integrations:
+    obsidian_integration: false
+    notion_integration: false
+    web_clipper_enabled: false
+
+# System Integration
+system:
+  file_associations:
+    register_file_types: true
+    add_to_startup: false
+    create_desktop_shortcut: true
+  
+  platform_specific:
+    windows:
+      add_to_context_menu: true
+      show_in_taskbar: true
+      system_tray_icon: true
+    macos:
+      show_in_dock: true
+      add_to_login_items: false
+      menu_bar_icon: true
+    linux:
+      create_desktop_entry: true
+      add_to_applications_menu: true
+      system_tray: true
+  
+  updates:
+    check_for_updates: false
+    auto_install_updates: false
+    update_channel: "stable"
+
+# Validation and Compliance
+validation:
+  content:
+    validate_file_integrity: true
+    check_for_malware: false
+    validate_metadata: true
+  
+  compliance:
+    gdpr_compliant: true
+    accessibility_compliant: true
+    security_audit_enabled: false
+  
+  quality:
+    automatic_quality_checks: true
+    periodic_self_tests: true
+    data_integrity_checks: true
+  
+  startup:
+    validate_config_on_startup: true
+    validate_database_on_startup: true
+    validate_models_on_startup: true

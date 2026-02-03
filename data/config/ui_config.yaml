@@ -1,0 +1,82 @@
+# UI Configuration
+# This file stores UI preferences and layout settings
+
+# Theme settings
+theme:
+  current: "dark"
+  available: ["dark", "light", "system"]
+  auto_detect: true
+
+# Window settings
+window:
+  width: 1200
+  height: 800
+  maximized: false
+  position:
+    x: 100
+    y: 100
+
+# Layout settings
+layout:
+  sidebar_width: 250
+  right_sidebar_width: 300
+  chat_height: 400
+  preview_height: 300
+
+# Chat settings
+chat:
+  font_size: 12
+  line_spacing: 1.2
+  show_timestamps: true
+  show_sources: true
+  max_message_history: 1000
+
+# Document view settings
+documents:
+  view_mode: "grid"  # grid or list
+  items_per_row: 3
+  show_thumbnails: true
+  show_metadata: true
+  sort_by: "date"  # name, date, size, type
+  sort_order: "descending"
+
+# Export settings
+export:
+  default_format: "markdown"
+  default_location: "${HOME}/Documents/cockatoo_v1_Exports"
+  include_timestamps: true
+  include_sources: true
+  pretty_formatting: true
+
+# Performance settings
+performance:
+  enable_animations: true
+  animation_speed: "normal"  # fast, normal, slow
+  lazy_loading: true
+  image_cache_size: 100  # MB
+
+# Accessibility
+accessibility:
+  high_contrast: false
+  large_text: false
+  screen_reader_support: false
+  keyboard_navigation: true
+
+# Customization
+customization:
+  accent_color: "#2B5278"
+  font_family: "Segoe UI"
+  custom_css: ""
+  
+# Recent files
+recent:
+  documents: []
+  conversations: []
+  searches: []
+  
+# User preferences
+preferences:
+  auto_save: true
+  auto_save_interval: 30  # minutes
+  confirm_on_exit: true
+  check_for_updates: false
