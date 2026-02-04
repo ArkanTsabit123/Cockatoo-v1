@@ -1,5 +1,3 @@
-# cockatoo_v1/data/config/app_config.yaml
-
 # cockatoo_v1 Application Configuration
 # Version: 1.0.0
 # Complete configuration for the cockatoo_v1 personal knowledge assistant
@@ -11,6 +9,7 @@ app:
   author: "cockatoo_v1 Development Team"
   license: "MIT"
   environment: "production"
+  description: "Personal Knowledge Assistant with RAG capabilities"
 
 # Directory Structure
 paths:
@@ -24,32 +23,47 @@ paths:
   config_dir: "${data_dir}/config"
   backups_dir: "${data_dir}/backups"
   plugins_dir: "${data_dir}/plugins"
+  cache_dir: "${data_dir}/cache"
 
 # Document Processing Configuration
 document_processing:
   chunking:
-    chunk_size: 500
+    chunk_size: 512
     chunk_overlap: 50
-    max_chunk_size: 1000
-    min_chunk_size: 50
+    max_chunk_size: 1024
+    min_chunk_size: 100
+    chunk_strategy: "recursive"  # recursive, fixed, sliding
   
   file_handling:
     max_file_size_mb: 100
     max_daily_uploads: 100
     auto_process_on_upload: true
     keep_original_files: true
+    validate_file_signatures: true
+    quarantine_suspicious_files: false
   
   supported_formats:
-    - ".pdf"
-    - ".docx"
-    - ".txt"
-    - ".epub"
-    - ".md"
-    - ".html"
-    - ".csv"
-    - ".jpg"
-    - ".png"
-    - ".jpeg"
+    text:
+      - ".pdf"
+      - ".docx"
+      - ".txt"
+      - ".epub"
+      - ".md"
+      - ".html"
+      - ".rtf"
+      - ".odt"
+    data:
+      - ".csv"
+      - ".xlsx"
+      - ".json"
+      - ".xml"
+    images:
+      - ".jpg"
+      - ".jpeg"
+      - ".png"
+      - ".tiff"
+      - ".bmp"
+      - ".gif"
   
   ocr:
     enabled: true
@@ -57,6 +71,8 @@ document_processing:
       - "eng"
       - "ind"
     confidence_threshold: 0.7
+    preprocess_images: true
+    deskew_images: true
   
   text_processing:
     remove_stop_words: true
@@ -64,6 +80,9 @@ document_processing:
     preserve_formatting: false
     language_detection: true
     extract_metadata: true
+    remove_special_characters: false
+    lemmatization: false
+    entity_extraction: true
 
 # Artificial Intelligence Configuration
 ai:
@@ -82,12 +101,15 @@ ai:
       repetition_penalty: 1.1
       frequency_penalty: 0.0
       presence_penalty: 0.0
+      stop_sequences: []
     
     system_parameters:
       timeout_seconds: 300
       retry_attempts: 3
+      retry_delay_seconds: 2
       streaming_enabled: true
       cache_responses: true
+      cache_ttl_minutes: 60
       batch_size: 1
     
     performance_settings:
@@ -95,10 +117,12 @@ ai:
       use_mmap: true
       use_mlock: false
       n_threads: 4
+      n_batch: 512
     
     prompts:
-      system_prompt: "You are cockatoo_v1, a helpful AI assistant that answers questions based on the provided documents. Always cite your sources when referencing document content."
+      system_prompt: "You are cockatoo_v1, a helpful AI assistant that answers questions based on the provided documents. Always cite your sources when referencing document content. If you don't know the answer based on the context, say so."
       user_prompt_template: "Context: {context}\n\nQuestion: {question}\n\nAnswer:"
+      follow_up_template: "Previous context: {previous_context}\n\nNew context: {new_context}\n\nQuestion: {question}\n\nAnswer:"
   
   # Alternative LLM Models
   alternative_models:
@@ -106,10 +130,12 @@ ai:
       provider: "ollama"
       temperature: 0.7
       max_tokens: 2048
+      context_window: 8192
     - name: "neural-chat:7b"
       provider: "ollama"
       temperature: 0.5
       max_tokens: 1024
+      context_window: 4096
   
   # Embedding Model Configuration
   embeddings:
@@ -120,14 +146,17 @@ ai:
     normalize_embeddings: true
     cache_embeddings: true
     cache_size_mb: 1000
+    cache_ttl_hours: 24
   
   # Alternative Embedding Models
   alternative_embeddings:
     - name: "all-mpnet-base-v2"
       dimensions: 768
+      max_sequence_length: 384
     - name: "paraphrase-multilingual-MiniLM-L12-v2"
       dimensions: 384
       languages: ["en", "id", "es", "fr", "de", "zh"]
+      max_sequence_length: 128
   
   # Retrieval Augmented Generation Configuration
   rag:
@@ -137,6 +166,8 @@ ai:
       enable_hybrid_search: true
       max_context_tokens: 3000
       include_metadata: true
+      rerank_results: false
+      reranker_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
     
     search_types:
       - "semantic"
@@ -147,6 +178,8 @@ ai:
       chunk_overlap_for_context: 0.2
       include_neighboring_chunks: true
       max_sources_per_response: 3
+      compress_context: false
+      context_compression_ratio: 0.5
 
 # Database Configuration
 database:
@@ -158,6 +191,7 @@ database:
     synchronous: "NORMAL"
     auto_migrate: true
     backup_before_migration: true
+    vacuum_on_startup: false
   
   chromadb:
     persist_directory: "${database_dir}/chroma"
@@ -167,11 +201,13 @@ database:
     create_collection_if_not_exists: true
     metadata_handling: "include"
     distance_function: "cosine"
+    allow_reset: true
   
   performance:
     optimize_on_startup: true
     vacuum_on_exit: false
     connection_timeout: 10
+    query_timeout: 30
 
 # User Interface Configuration
 ui:
@@ -179,9 +215,10 @@ ui:
     theme: "dark"
     color_scheme: "blue"
     language: "en"
-    font_family: "Segoe UI"
+    font_family: "Segoe UI, -apple-system, BlinkMacSystemFont, sans-serif"
     font_size: 12
     scaling_factor: 1.0
+    high_contrast: false
   
   features:
     enable_animations: true
@@ -189,6 +226,8 @@ ui:
     auto_save_interval: 60
     confirm_on_exit: true
     show_welcome_screen: true
+    auto_update_check: false
+    check_spelling: false
   
   layout:
     default_window_width: 1200
@@ -196,18 +235,24 @@ ui:
     sidebar_width: 300
     chat_panel_width: 500
     preview_panel_width: 400
+    show_status_bar: true
+    show_toolbar: true
   
   document_viewer:
     show_line_numbers: true
     wrap_text: true
     highlight_active_line: true
     show_metadata_panel: true
+    syntax_highlighting: true
+    font_size: 11
   
   chat_interface:
     show_typing_indicator: true
     markdown_rendering: true
     syntax_highlighting: true
     auto_scroll_to_bottom: true
+    show_avatar: true
+    message_bubble_style: "rounded"
 
 # Storage Management
 storage:
@@ -216,56 +261,70 @@ storage:
     max_conversations: 1000
     max_document_size_mb: 50
     max_total_storage_gb: 100
+    max_file_count: 50000
   
   cleanup:
     auto_cleanup_days: 90
     cleanup_unprocessed_days: 7
     cleanup_temp_files_hours: 24
+    cleanup_orphaned_chunks: true
   
   backup:
     enabled: true
     interval_hours: 24
     retention_days: 30
     location: "${backups_dir}"
+    compress_backups: true
+    encryption_enabled: false
   
   security:
     encryption_enabled: false
     encrypt_sensitive_data: true
     secure_delete: false
+    secure_delete_passes: 3
   
   cache:
     max_cache_size_mb: 1000
     cache_cleanup_interval_hours: 12
+    enable_memory_cache: true
+    enable_disk_cache: true
 
 # Performance Configuration
 performance:
   resources:
     max_workers: 4
     max_memory_mb: 4096
-    cpu_threads: 0
+    cpu_threads: 0  # 0 = auto
+    gpu_enabled: false
+    gpu_memory_fraction: 0.5
   
   caching:
     enabled: true
     cache_size_mb: 500
     cache_ttl_hours: 24
     preload_frequent_documents: true
+    cache_embeddings: true
   
   optimization:
     lazy_loading: true
     batch_processing: true
     background_indexing: true
     incremental_updates: true
+    compression_enabled: true
   
   monitoring:
     enable_monitoring: true
     metrics_collection: true
     performance_logging: true
     resource_usage_alerts: true
+    alert_threshold_cpu: 80
+    alert_threshold_memory: 85
   
   threading:
     io_threads: 2
     compute_threads: 2
     database_threads: 2
+    network_threads: 2
 
 # Privacy and Security
 privacy:
@@ -274,22 +333,27 @@ privacy:
     crash_reports: false
     usage_statistics: false
     anonymous_feedback: false
+    collect_performance_metrics: false
   
   network:
     auto_update_check: false
     check_for_updates: false
     allow_external_connections: false
+    proxy_enabled: false
+    proxy_settings: {}
   
   local_data:
     store_search_history: true
     store_conversation_history: true
     encrypt_local_data: false
     clear_cache_on_exit: false
+    anonymize_filenames: false
   
   privacy_features:
-    anonymize_filenames: false
     remove_metadata_on_export: false
-    secure_delete_method: "simple"
+    secure_delete_method: "simple"  # simple, secure, zero
+    clear_clipboard_after_copy: false
+    session_timeout_minutes: 0  # 0 = disabled
 
 # Logging Configuration
 logging:
@@ -297,29 +361,34 @@ logging:
     console_level: "INFO"
     file_level: "DEBUG"
     database_level: "WARNING"
+    performance_level: "INFO"
   
   files:
     app_log_file: "${logs_dir}/app.log"
     error_log_file: "${logs_dir}/error.log"
     access_log_file: "${logs_dir}/access.log"
     performance_log_file: "${logs_dir}/performance.log"
+    debug_log_file: "${logs_dir}/debug.log"
   
   rotation:
     max_log_size_mb: 10
     backup_count: 5
     compress_old_logs: true
+    rotate_on_startup: false
   
   format:
-    log_format: "json"
+    log_format: "json"  # json, text
     include_timestamp: true
     include_process_id: true
     include_thread_id: true
+    include_function_name: true
   
   components:
     log_document_processing: true
     log_ai_requests: true
     log_database_queries: false
     log_ui_events: false
+    log_performance_metrics: true
 
 # Advanced Features
 advanced:
@@ -328,25 +397,31 @@ advanced:
     plugin_directory: "${plugins_dir}"
     auto_load_plugins: true
     plugin_sandbox: true
+    plugin_whitelist: []
+    plugin_blacklist: []
   
   experimental:
     experimental_features: false
     enable_beta_features: false
+    unsafe_mode: false
   
   developer:
     developer_mode: false
     debug_logging: false
     show_internal_errors: false
+    enable_profiling: false
   
   customization:
     allow_custom_themes: true
     allow_keyboard_shortcuts: true
     allow_scripting: false
+    allow_api_access: false
   
   processing:
     enable_preprocessing_pipeline: true
     enable_postprocessing_pipeline: true
     parallel_processing: true
+    max_parallel_processes: 2
 
 # Export Configuration
 export:
@@ -357,7 +432,19 @@ export:
       - "html"
       - "txt"
       - "json"
+      - "csv"
     default_export_format: "markdown"
+    export_quality_presets:
+      low:
+        include_images: false
+        compress: true
+      medium:
+        include_images: true
+        compress: false
+      high:
+        include_images: true
+        compress: false
+        high_quality: true
   
   settings:
     include_timestamps: true
@@ -366,11 +453,13 @@ export:
     export_quality: "high"
     include_images: true
     preserve_formatting: true
+    include_source_citations: true
   
   integrations:
     obsidian_integration: false
     notion_integration: false
     web_clipper_enabled: false
+    export_to_cloud: false
 
 # System Integration
 system:
@@ -378,25 +467,30 @@ system:
     register_file_types: true
     add_to_startup: false
     create_desktop_shortcut: true
+    create_menu_entry: true
   
   platform_specific:
     windows:
       add_to_context_menu: true
       show_in_taskbar: true
       system_tray_icon: true
+      run_as_admin: false
     macos:
       show_in_dock: true
       add_to_login_items: false
       menu_bar_icon: true
+      bundle_identifier: "com.cockatoo.v1"
     linux:
       create_desktop_entry: true
       add_to_applications_menu: true
       system_tray: true
+      app_id: "cockatoo_v1"
   
   updates:
     check_for_updates: false
     auto_install_updates: false
     update_channel: "stable"
+    update_url: ""
 
 # Validation and Compliance
 validation:
@@ -404,18 +498,22 @@ validation:
     validate_file_integrity: true
     check_for_malware: false
     validate_metadata: true
+    verify_checksums: false
   
   compliance:
     gdpr_compliant: true
     accessibility_compliant: true
     security_audit_enabled: false
+    data_retention_policy: "90_days"
   
   quality:
     automatic_quality_checks: true
     periodic_self_tests: true
     data_integrity_checks: true
+    run_health_check_on_startup: true
   
   startup:
     validate_config_on_startup: true
     validate_database_on_startup: true
     validate_models_on_startup: true
+    repair_on_error: true

@@ -4,32 +4,47 @@
 
 # Supported LLM Providers
 providers:
-  - name: "ollama"
+  ollama:
+    name: "ollama"
     enabled: true
     priority: 1
     api_endpoint: "http://localhost:11434"
+    api_version: "v1"
     timeout_seconds: 300
     api_key: ""
+    verify_ssl: false
+    max_connections: 10
+    connection_timeout: 10
     
-  - name: "openai"
+  openai:
+    name: "openai"
     enabled: false
     priority: 2
     api_endpoint: "https://api.openai.com/v1"
     api_key: ""
     organization: ""
+    project: ""
+    timeout_seconds: 120
+    max_retries: 3
     
-  - name: "huggingface"
+  huggingface:
+    name: "huggingface"
     enabled: false
     priority: 3
     api_endpoint: "https://api-inference.huggingface.co/models"
     api_key: ""
+    timeout_seconds: 180
+    wait_for_model: true
     
-  - name: "local"
+  local:
+    name: "local"
     enabled: false
     priority: 4
     model_path: "${models_dir}/local"
     use_gpu: false
     gpu_layers: 0
+    gpu_device: "cuda:0"
+    tensor_split: []
 
 # Available Models Configuration
 models:
@@ -38,109 +53,165 @@ models:
   
   # Model configurations
   configurations:
-    - name: "llama2:7b"
+    llama2_7b:
+      name: "llama2:7b"
       provider: "ollama"
       display_name: "Llama 2 7B"
       description: "7 billion parameter Llama 2 model from Meta"
       context_size: 4096
       parameter_count: 7000000000
       license: "Llama 2 Community License"
+      tags: ["general", "conversation", "english"]
       
       # Performance characteristics
       tokens_per_second: 30
       memory_usage_mb: 4000
       disk_size_gb: 4.2
       quantization: "Q4_0"
+      architecture: "llama"
       
       # Generation parameters
       temperature: 0.7
       top_p: 0.9
       top_k: 40
       repeat_penalty: 1.1
+      typical_p: 1.0
+      stop_tokens: ["</s>", "[INST]", "[/INST]"]
       
       # System requirements
       min_ram_gb: 8
       recommended_ram_gb: 16
       supports_gpu: true
       recommended_vram_gb: 6
+      supported_platforms: ["windows", "linux", "macos"]
       
-    - name: "mistral:7b"
+    mistral_7b:
+      name: "mistral:7b"
       provider: "ollama"
       display_name: "Mistral 7B"
       description: "7 billion parameter Mistral model with 8K context"
       context_size: 8192
       parameter_count: 7300000000
       license: "Apache 2.0"
+      tags: ["general", "conversation", "multilingual"]
       
       # Performance characteristics
       tokens_per_second: 35
       memory_usage_mb: 4500
       disk_size_gb: 4.1
       quantization: "Q4_0"
+      architecture: "mistral"
       
       # Generation parameters
       temperature: 0.7
       top_p: 0.95
       top_k: 50
       repeat_penalty: 1.0
+      typical_p: 1.0
+      stop_tokens: ["</s>"]
       
       # System requirements
       min_ram_gb: 8
       recommended_ram_gb: 16
       supports_gpu: true
       recommended_vram_gb: 6
+      supported_platforms: ["windows", "linux", "macos"]
       
-    - name: "neural-chat:7b"
+    neural_chat_7b:
+      name: "neural-chat:7b"
       provider: "ollama"
       display_name: "Neural Chat 7B"
       description: "Fine-tuned Llama 2 for conversation"
       context_size: 4096
       parameter_count: 7000000000
       license: "Llama 2 Community License"
+      tags: ["chat", "conversation", "assistant"]
       
       # Performance characteristics
       tokens_per_second: 25
       memory_usage_mb: 4200
       disk_size_gb: 4.3
       quantization: "Q4_0"
+      architecture: "llama"
       
       # Generation parameters
       temperature: 0.5
       top_p: 0.9
       top_k: 40
       repeat_penalty: 1.2
+      typical_p: 1.0
+      stop_tokens: ["</s>", "[INST]", "[/INST]"]
       
       # System requirements
       min_ram_gb: 8
       recommended_ram_gb: 16
       supports_gpu: true
       recommended_vram_gb: 6
+      supported_platforms: ["windows", "linux", "macos"]
       
-    - name: "codellama:7b"
+    codellama_7b:
+      name: "codellama:7b"
       provider: "ollama"
       display_name: "Code Llama 7B"
       description: "Llama 2 fine-tuned for coding tasks"
       context_size: 16384
       parameter_count: 7000000000
       license: "Llama 2 Community License"
+      tags: ["coding", "programming", "development"]
       
       # Performance characteristics
       tokens_per_second: 20
       memory_usage_mb: 5000
       disk_size_gb: 4.5
       quantization: "Q4_0"
+      architecture: "llama"
       
       # Generation parameters
       temperature: 0.2
       top_p: 0.95
       top_k: 10
       repeat_penalty: 1.1
+      typical_p: 1.0
+      stop_tokens: ["</s>", "[INST]", "[/INST]"]
       
       # System requirements
       min_ram_gb: 12
       recommended_ram_gb: 24
       supports_gpu: true
       recommended_vram_gb: 8
+      supported_platforms: ["windows", "linux", "macos"]
+      
+    gemma_2b:
+      name: "gemma:2b"
+      provider: "ollama"
+      display_name: "Gemma 2B"
+      description: "Lightweight 2 billion parameter model from Google"
+      context_size: 8192
+      parameter_count: 2000000000
+      license: "Gemma License"
+      tags: ["lightweight", "fast", "efficient"]
+      
+      # Performance characteristics
+      tokens_per_second: 100
+      memory_usage_mb: 2000
+      disk_size_gb: 1.5
+      quantization: "Q4_0"
+      architecture: "gemma"
+      
+      # Generation parameters
+      temperature: 0.7
+      top_p: 0.9
+      top_k: 50
+      repeat_penalty: 1.1
+      typical_p: 1.0
+      stop_tokens: ["<end_of_turn>", "<eos>"]
+      
+      # System requirements
+      min_ram_gb: 4
+      recommended_ram_gb: 8
+      supports_gpu: true
+      recommended_vram_gb: 4
+      supported_platforms: ["windows", "linux", "macos"]
 
 # Default Generation Parameters
 generation:
@@ -148,11 +219,13 @@ generation:
   temperature: 0.7
   min_temperature: 0.0
   max_temperature: 2.0
+  temperature_step: 0.1
   
   # Top-p nucleus sampling
   top_p: 0.9
   min_top_p: 0.1
   max_top_p: 1.0
+  top_p_step: 0.05
   
   # Top-k sampling
   top_k: 40
@@ -163,6 +236,7 @@ generation:
   repetition_penalty: 1.1
   min_repetition_penalty: 1.0
   max_repetition_penalty: 2.0
+  repetition_penalty_step: 0.1
   
   # Frequency and presence penalties
   frequency_penalty: 0.0
@@ -172,51 +246,99 @@ generation:
   max_tokens: 2048
   min_tokens: 1
   max_context_tokens: 4096
+  truncation_strategy: "left"  # left, right
   
   # Streaming
   stream: true
   stream_chunk_size: 20
+  stream_delay_ms: 0
+  
+  # Other parameters
+  seed: -1  # -1 = random
+  echo: false
+  logprobs: null
+  logit_bias: {}
 
 # Prompt Templates
 prompts:
   # System prompts
   system:
-    default: "You are cockatoo_v1, a helpful AI assistant that answers questions based on the provided documents. Always cite your sources when referencing document content."
-    
-    concise: "You are a concise assistant. Answer questions directly and briefly."
-    
-    detailed: "You are a detailed assistant. Provide answers with explanations."
-    
-    creative: "You are a creative assistant. Provide imaginative and engaging responses."
+    default: |
+      You are cockatoo_v1, a helpful AI assistant that answers questions based on the provided documents.
+      Always cite your sources when referencing document content.
+      If you don't know the answer based on the context, say so.
+      Be accurate, concise, and helpful.
+      
+    concise: |
+      You are a concise assistant. Answer questions directly and briefly.
+      Provide only essential information.
+      Cite sources when relevant.
+      
+    detailed: |
+      You are a detailed assistant. Provide answers with explanations, context, and examples.
+      Structure your responses clearly.
+      Always cite your sources.
+      
+    creative: |
+      You are a creative assistant. Provide imaginative and engaging responses.
+      Think outside the box while staying relevant to the question.
+      Cite sources when appropriate.
+      
+    coding: |
+      You are a programming assistant. Provide code solutions with explanations.
+      Include comments and best practices.
+      If the question is not about programming, redirect appropriately.
   
   # User prompt templates
   user:
     rag_template: |
-      Context: {context}
+      Based on the following context, answer the question.
+      If the context doesn't contain relevant information, say "I don't have enough information to answer this question."
+      Always cite sources using the format [Document: {source}, Page: {page}].
+      
+      Context:
+      {context}
       
       Question: {question}
       
-      Answer based on the provided context. If the context doesn't contain relevant information, say so. Always cite sources when available.
+      Answer:
       
     simple_template: "Question: {question}\n\nAnswer:"
     
     chat_template: |
-      Conversation history:
+      Conversation History:
       {history}
       
-      Current question: {question}
+      Current Question: {question}
       
-      Answer:
-    
-    summarization_template: "Summarize the following text:\n\n{text}\n\nSummary:"
+      Answer based on the conversation history and your knowledge:
+      
+    summarization_template: |
+      Summarize the following text concisely while preserving key information:
+      
+      Text:
+      {text}
+      
+      Summary:
+      
+    translation_template: |
+      Translate the following text from {source_language} to {target_language}:
+      
+      Text:
+      {text}
+      
+      Translation:
   
   # Assistant prompt templates
   assistant:
     citation_format: "[Source: {source}, Page: {page}]"
+    multiple_citation_format: "[Sources: {sources}]"
     
-    unknown_answer: "I couldn't find relevant information in the provided documents to answer this question."
-    
+    unknown_answer: "I don't have enough information in the provided documents to answer this question."
     processing: "Processing your query..."
+    thinking_prefix: "Let me think about this..."
+    
+    error_response: "I encountered an error while processing your request. Please try again."
 
 # Model Management
 management:
@@ -225,21 +347,31 @@ management:
   download_verify_checksums: true
   download_timeout_minutes: 60
   resume_downloads: true
+  download_chunk_size_mb: 10
+  download_retries: 3
   
   # Update settings
   check_for_model_updates: false
   auto_update_models: false
   update_frequency_days: 7
+  update_notifications: true
   
   # Cache settings
   cache_downloaded_models: true
   cache_location: "${models_dir}/cache"
   max_cache_size_gb: 20
+  cleanup_old_cache: true
   
   # Cleanup settings
   remove_unused_models: false
   keep_minimum_models: 1
   cleanup_interval_days: 30
+  cleanup_strategy: "oldest_first"  # oldest_first, largest_first, least_used
+  
+  # Installation settings
+  install_dependencies: true
+  create_model_index: true
+  verify_installation: true
 
 # Performance Optimization
 performance:
@@ -247,21 +379,31 @@ performance:
   cache_generated_responses: true
   cache_ttl_minutes: 60
   max_cache_size_mb: 1000
+  cache_eviction_policy: "lru"  # lru, fifo, random
   
   # Batching
   batch_requests: false
   max_batch_size: 8
   batch_timeout_ms: 100
+  batch_strategy: "fixed"  # fixed, dynamic
   
   # Parallelism
   parallel_generations: false
   max_parallel_requests: 2
   thread_pool_size: 4
+  thread_affinity: false
   
   # Memory management
   unload_inactive_models: true
   inactive_timeout_minutes: 30
   max_loaded_models: 1
+  memory_monitoring: true
+  memory_threshold_mb: 100
+  
+  # GPU optimization
+  use_cuda_graphs: false
+  use_flash_attention: false
+  use_quantization: true
 
 # Monitoring and Logging
 monitoring:
@@ -269,21 +411,27 @@ monitoring:
   log_all_requests: false
   log_request_details: false
   anonymize_logs: true
+  log_sanitization: true
+  log_retention_days: 30
   
   # Performance metrics
   track_response_times: true
   track_token_usage: true
   track_model_loading: true
+  track_memory_usage: true
+  metrics_aggregation: true
   
   # Error tracking
   log_errors: true
   log_warnings: true
   error_reporting: false
+  error_threshold: 10
   
   # Analytics
   collect_usage_stats: false
   anonymize_statistics: true
   statistics_retention_days: 30
+  usage_patterns: false
 
 # Fallback and Error Handling
 fallback:
@@ -292,20 +440,29 @@ fallback:
     - "llama2:7b"
     - "mistral:7b"
     - "neural-chat:7b"
+    - "gemma:2b"
   
   # Provider fallback
   provider_fallback: true
   fallback_timeout_seconds: 10
+  fallback_max_attempts: 2
   
   # Error handling
   retry_on_failure: true
   max_retries: 3
   retry_delay_seconds: 2
+  exponential_backoff: true
   
   # Graceful degradation
   use_simpler_model_on_error: true
   reduce_context_on_oom: true
   fallback_to_keyword_search: true
+  show_degraded_mode_warning: true
+  
+  # Timeout handling
+  request_timeout_seconds: 300
+  connect_timeout_seconds: 10
+  read_timeout_seconds: 60
 
 # Quality Control
 quality:
@@ -313,17 +470,26 @@ quality:
   validate_responses: true
   check_for_hallucinations: true
   verify_citations: true
+  fact_checking: false
   
   # Content filtering
   filter_inappropriate_content: true
   profanity_filter: true
   bias_detection: false
+  toxicity_filter: true
   
   # Quality metrics
   minimum_confidence_score: 0.5
   require_citations_for_facts: true
   flag_low_confidence_responses: true
+  response_length_check: true
   
   # Improvement
   collect_feedback: false
   use_feedback_for_improvement: false
+  a_b_testing: false
+  
+  # Safety
+  safe_mode: true
+  max_response_length_tokens: 4096
+  content_warning_threshold: 0.8

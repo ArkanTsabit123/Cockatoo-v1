@@ -1,34 +1,274 @@
 # Cockatoo_v1 - User Configuration
 # User-specific settings
+# Version: 1.0.0
 
+# User Profile
 user:
-  name: "User"
-  email: ""
-  
+  profile:
+    name: "User"
+    email: ""
+    avatar: ""  # Path to avatar image
+    bio: ""
+    location: ""
+    timezone: "UTC"
+    
+  preferences_id: ""  # Unique identifier for preferences sync
+  created_at: null
+  last_login: null
+  login_count: 0
+
+# Application Preferences
 preferences:
   theme: "auto"  # auto, dark, light
   language: "en"
-  notifications: true
+  date_format: "YYYY-MM-DD"
+  time_format: "24h"  # 12h, 24h
+  first_day_of_week: "monday"  # sunday, monday
+  
+  notifications:
+    enabled: true
+    sound: true
+    desktop: true
+    types:
+      processing: true
+      errors: true
+      updates: false
+      reminders: false
+      
   auto_save: true
+  auto_save_interval: 30  # minutes
   auto_backup: true
+  backup_interval: 24  # hours
+  backup_retention: 7  # days
   
+  startup:
+    restore_session: true
+    open_last_document: false
+    show_welcome: false
+    check_for_updates: false
+
+# Document View Preferences
 document_view:
-  default_view: "grid"  # grid, list
-  sort_by: "date"  # name, date, size, type
-  sort_order: "desc"  # asc, desc
-  show_thumbnails: true
-  
+  default_view: "grid"  # grid, list, detailed
+  grid:
+    items_per_row: 3
+    thumbnail_size: "medium"  # small, medium, large
+    show_titles: true
+    show_dates: true
+    
+  list:
+    show_thumbnails: true
+    show_details: true
+    compact_mode: false
+    
+  sorting:
+    sort_by: "modified_date"  # name, size, type, created_date, modified_date
+    sort_order: "descending"  # ascending, descending
+    group_by_folder: true
+    show_hidden: false
+    
+  preview:
+    auto_preview: false
+    preview_position: "right"  # right, bottom, floating
+    preview_size: "medium"  # small, medium, large
+    
+  thumbnails:
+    enabled: true
+    generate_on_import: true
+    cache_thumbnails: true
+    max_thumbnail_size: 256  # pixels
+
+# AI Preferences
 ai_preferences:
-  default_model: "llama2:7b"
-  response_length: "medium"  # short, medium, long
-  include_sources: true
-  show_confidence: true
-  
+  model_selection:
+    default_model: "llama2:7b"
+    auto_select_model: true
+    model_selection_criteria: "balance"  # speed, quality, balance
+    
+  response_settings:
+    response_length: "medium"  # short, medium, long, verbose
+    tone: "neutral"  # formal, casual, neutral, technical
+    creativity: 0.7  # 0.0 to 1.0
+    include_sources: true
+    show_confidence: true
+    confidence_threshold: 0.5
+    
+  context_management:
+    max_context_items: 10
+    include_metadata: true
+    compress_context: false
+    context_window_tokens: 3000
+    
+  citation_preferences:
+    citation_style: "numeric"  # numeric, author-date, footnote
+    show_citation_popups: true
+    include_page_numbers: true
+    citation_format: "[{source}, p.{page}]"
+    
+  privacy:
+    store_conversations: true
+    store_queries: true
+    anonymize_queries: false
+    local_processing: true
+
+# Shortcuts Configuration
 shortcuts:
-  new_conversation: "Ctrl+N"
-  open_document: "Ctrl+O"
-  save_conversation: "Ctrl+S"
-  export_conversation: "Ctrl+E"
-  search_documents: "Ctrl+F"
+  enabled: true
+  profile: "default"  # default, vscode, custom
   
-# Last updated: 2026-02-03 22:21:46.874796
+  custom:
+    new_conversation: "Ctrl+N"
+    open_document: "Ctrl+O"
+    save_conversation: "Ctrl+S"
+    export_conversation: "Ctrl+E"
+    search_documents: "Ctrl+F"
+    quick_search: "Ctrl+K"
+    toggle_sidebar: "Ctrl+B"
+    close_tab: "Ctrl+W"
+    new_tab: "Ctrl+T"
+    next_tab: "Ctrl+Tab"
+    previous_tab: "Ctrl+Shift+Tab"
+    zoom_in: "Ctrl++"
+    zoom_out: "Ctrl+-"
+    reset_zoom: "Ctrl+0"
+    find_in_document: "Ctrl+F"
+    replace_text: "Ctrl+H"
+    select_all: "Ctrl+A"
+    copy: "Ctrl+C"
+    paste: "Ctrl+V"
+    undo: "Ctrl+Z"
+    redo: "Ctrl+Y"
+    print: "Ctrl+P"
+    help: "F1"
+    developer_tools: "F12"
+    
+  conflicts: []  # List of conflicting shortcuts
+
+# Export Preferences
+export_preferences:
+  default_location: "${HOME}/Documents/cockatoo_v1_Exports"
+  organization:
+    create_folders: true
+    folder_structure: "{type}/{year}/{month}"
+    overwrite_policy: "rename"  # rename, overwrite, ask
+    
+  formats:
+    conversation: "markdown"
+    document: "pdf"
+    settings: "json"
+    
+  quality:
+    image_quality: 90  # percentage
+    compression_level: 6  # 0-9
+    include_metadata: true
+    embed_fonts: false
+    
+  batch:
+    enabled: false
+    max_concurrent: 3
+    notify_completion: true
+
+# Privacy Settings
+privacy:
+  data_collection:
+    telemetry: false
+    crash_reports: false
+    usage_statistics: false
+    improvement_program: false
+    
+  local_data:
+    store_history: true
+    history_retention_days: 90
+    clear_history_on_exit: false
+    encrypt_local_data: false
+    
+  search_privacy:
+    store_search_history: true
+    anonymize_searches: false
+    clear_search_history_days: 30
+    
+  export_privacy:
+    remove_metadata: false
+    anonymize_content: false
+    secure_delete: false
+
+# Workspace Settings
+workspace:
+  recent_workspaces: []
+  default_workspace: "${HOME}/.cockatoo_v1/workspace"
+  
+  layout:
+    remember_layout: true
+    restore_layout_on_startup: true
+    auto_arrange_windows: false
+    
+  projects:
+    max_recent_projects: 10
+    auto_save_projects: true
+    project_backup_count: 3
+
+# Advanced Settings
+advanced:
+  developer:
+    developer_mode: false
+    show_debug_info: false
+    enable_logging: false
+    log_level: "info"
+    
+  experimental:
+    experimental_features: false
+    beta_features: false
+    unstable_apis: false
+    
+  performance:
+    cache_size_mb: 500
+    max_workers: 4
+    memory_limit_mb: 0  # 0 = no limit
+    enable_hardware_acceleration: true
+    
+  network:
+    proxy_enabled: false
+    proxy_settings: {}
+    timeout_seconds: 30
+    retry_attempts: 3
+
+# Session Data
+session:
+  current_document: ""
+  current_conversation: ""
+  open_documents: []
+  window_state: {}
+  last_search: ""
+  
+  ui_state:
+    sidebar_visible: true
+    right_sidebar_visible: false
+    right_sidebar_tab: "properties"
+    zoom_level: 1.0
+    
+  temporary:
+    clipboard_history: []
+    undo_stack: []
+    redo_stack: []
+
+# Statistics
+statistics:
+  documents_processed: 0
+  conversations_created: 0
+  searches_performed: 0
+  exports_created: 0
+  total_processing_time: 0
+  last_reset: null
+  
+  daily_stats:
+    documents_today: 0
+    conversations_today: 0
+    date: null
+
+# Version and Metadata
+metadata:
+  version: "1.0.0"
+  config_version: "1.0.0"
+  last_updated: "2026-02-03 22:21:46.874796"
+  created: null
+  updated_by: "system"

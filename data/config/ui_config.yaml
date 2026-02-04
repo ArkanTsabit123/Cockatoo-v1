@@ -1,82 +1,343 @@
 # UI Configuration
 # This file stores UI preferences and layout settings
+# Version: 1.0.0
+
+# Application State
+application:
+  version: "1.0.0"
+  last_opened: null
+  session_count: 0
+  first_run: true
 
 # Theme settings
 theme:
   current: "dark"
-  available: ["dark", "light", "system"]
+  available:
+    - name: "dark"
+      primary: "#1e293b"
+      secondary: "#334155"
+      accent: "#3b82f6"
+      text: "#f8fafc"
+      success: "#10b981"
+      warning: "#f59e0b"
+      error: "#ef4444"
+    - name: "light"
+      primary: "#ffffff"
+      secondary: "#f1f5f9"
+      accent: "#2563eb"
+      text: "#1e293b"
+      success: "#059669"
+      warning: "#d97706"
+      error: "#dc2626"
+    - name: "blue"
+      primary: "#1e40af"
+      secondary: "#1e3a8a"
+      accent: "#60a5fa"
+      text: "#dbeafe"
+      success: "#34d399"
+      warning: "#fbbf24"
+      error: "#f87171"
+  
   auto_detect: true
+  follow_system: true
+  accent_color: "#3b82f6"
+  custom_colors: {}
+  css_overrides: ""
 
 # Window settings
 window:
   width: 1200
   height: 800
   maximized: false
+  fullscreen: false
+  always_on_top: false
+  transparency: 1.0
   position:
     x: 100
     y: 100
+    monitor: 0
+  
+  state:
+    remember_size: true
+    remember_position: true
+    restore_on_startup: true
 
 # Layout settings
 layout:
-  sidebar_width: 250
-  right_sidebar_width: 300
-  chat_height: 400
-  preview_height: 300
+  sidebar:
+    width: 250
+    position: "left"  # left, right
+    visible: true
+    collapsible: true
+    auto_hide: false
+    show_icons: true
+    show_text: true
+    
+  right_sidebar:
+    width: 300
+    visible: false
+    default_tab: "properties"  # properties, outline, search
+    
+  main_area:
+    split_orientation: "horizontal"  # horizontal, vertical
+    chat_height: 400
+    preview_height: 300
+    resizable: true
+    minimum_sizes:
+      chat: 200
+      preview: 150
+    
+  tabs:
+    show_close_buttons: true
+    show_new_tab_button: true
+    tab_position: "top"  # top, bottom, left, right
+    tab_width: "flexible"  # flexible, fixed
+    maximum_tabs: 20
 
 # Chat settings
 chat:
-  font_size: 12
-  line_spacing: 1.2
-  show_timestamps: true
-  show_sources: true
-  max_message_history: 1000
+  appearance:
+    font_family: "Segoe UI, -apple-system, sans-serif"
+    font_size: 12
+    line_spacing: 1.2
+    message_spacing: 8
+    bubble_radius: 12
+    max_width: 800
+    
+  display:
+    show_timestamps: true
+    timestamp_format: "%H:%M"
+    show_sources: true
+    show_avatars: true
+    show_typing_indicator: true
+    show_read_receipts: false
+    show_online_status: false
+    
+  behavior:
+    max_message_history: 1000
+    auto_scroll: true
+    smooth_scroll: true
+    load_more_threshold: 100
+    typing_timeout_seconds: 5
+    message_grouping_timeout: 300  # seconds
+    
+  input:
+    multiline: true
+    max_lines: 10
+    show_word_count: false
+    auto_grow: true
+    placeholder_text: "Type your message here..."
+    send_on_enter: true
+    ctrl_enter_for_newline: true
+    
+  formatting:
+    markdown_enabled: true
+    syntax_highlighting: true
+    code_theme: "github-dark"
+    latex_rendering: false
+    emoji_support: true
+    link_preview: false
 
 # Document view settings
 documents:
-  view_mode: "grid"  # grid or list
-  items_per_row: 3
-  show_thumbnails: true
-  show_metadata: true
-  sort_by: "date"  # name, date, size, type
-  sort_order: "descending"
+  view_mode: "grid"  # grid, list, detailed
+  grid:
+    items_per_row: 3
+    spacing: 10
+    show_thumbnails: true
+    thumbnail_size: "medium"  # small, medium, large
+    show_badges: true
+  list:
+    show_icons: true
+    show_details: true
+    row_height: 40
+  sorting:
+    sort_by: "modified_date"  # name, size, type, created_date, modified_date
+    sort_order: "descending"  # ascending, descending
+    group_by: "none"  # none, type, date, size
+  filtering:
+    show_hidden: false
+    show_system: false
+    file_types: "all"  # all, documents, images, other
+  preview:
+    enabled: true
+    auto_preview: false
+    preview_size: "medium"
+    show_metadata: true
+    show_quick_actions: true
 
 # Export settings
 export:
-  default_format: "markdown"
-  default_location: "${HOME}/Documents/cockatoo_v1_Exports"
-  include_timestamps: true
-  include_sources: true
-  pretty_formatting: true
+  formats:
+    default_format: "markdown"
+    available_formats:
+      markdown:
+        extension: ".md"
+        mime_type: "text/markdown"
+        include_frontmatter: true
+      pdf:
+        extension: ".pdf"
+        mime_type: "application/pdf"
+        quality: "high"
+      html:
+        extension: ".html"
+        mime_type: "text/html"
+        embed_images: true
+      txt:
+        extension: ".txt"
+        mime_type: "text/plain"
+        encoding: "utf-8"
+      json:
+        extension: ".json"
+        mime_type: "application/json"
+        pretty_print: true
+    
+  settings:
+    default_location: "${HOME}/Documents/cockatoo_v1_Exports"
+    create_subdirectories: true
+    filename_template: "{title}_{date}"
+    include_timestamps: true
+    include_sources: true
+    include_metadata: true
+    pretty_formatting: true
+    compress_output: false
+    
+  templates:
+    conversation_template: "conversation_template.md"
+    document_template: "document_template.md"
+    custom_templates: []
 
 # Performance settings
 performance:
-  enable_animations: true
-  animation_speed: "normal"  # fast, normal, slow
-  lazy_loading: true
-  image_cache_size: 100  # MB
+  rendering:
+    enable_animations: true
+    animation_speed: "normal"  # fast, normal, slow
+    transition_duration: 200  # ms
+    hardware_acceleration: true
+    
+  loading:
+    lazy_loading: true
+    virtual_scrolling: true
+    batch_size: 50
+    preload_count: 20
+    
+  caching:
+    image_cache_size: 100  # MB
+    document_cache_size: 200  # MB
+    ui_cache_size: 50  # MB
+    cache_ttl_hours: 24
+    
+  memory:
+    memory_warning_threshold: 80  # percentage
+    auto_cleanup: true
+    cleanup_interval_minutes: 30
 
 # Accessibility
 accessibility:
-  high_contrast: false
-  large_text: false
-  screen_reader_support: false
-  keyboard_navigation: true
+  visual:
+    high_contrast: false
+    large_text: false
+    font_scaling: 1.0
+    reduce_motion: false
+    color_blind_mode: "none"  # none, protanopia, deuteranopia, tritanopia
+    
+  auditory:
+    sound_effects: true
+    volume: 0.5
+    mute: false
+    
+  interaction:
+    keyboard_navigation: true
+    screen_reader_support: false
+    focus_highlight: true
+    tab_index_cycling: true
+    
+  cognitive:
+    simplified_ui: false
+    reduce_distractions: false
+    reading_mode: false
 
 # Customization
 customization:
-  accent_color: "#2B5278"
-  font_family: "Segoe UI"
-  custom_css: ""
-  
-# Recent files
+  appearance:
+    accent_color: "#2B5278"
+    font_family: "Segoe UI"
+    custom_css: ""
+    icon_set: "default"  # default, material, fluent, custom
+    rounded_corners: true
+    
+  behavior:
+    hover_effects: true
+    click_effects: true
+    tooltip_delay: 500  # ms
+    context_menu_delay: 300  # ms
+    
+  shortcuts:
+    enabled: true
+    profiles:
+      default:
+        new_conversation: "Ctrl+N"
+        open_document: "Ctrl+O"
+        save_conversation: "Ctrl+S"
+        export_conversation: "Ctrl+E"
+        search_documents: "Ctrl+F"
+        toggle_sidebar: "Ctrl+B"
+        quick_search: "Ctrl+K"
+      vscode:
+        new_conversation: "Ctrl+Shift+N"
+        open_document: "Ctrl+O"
+        save_conversation: "Ctrl+S"
+        export_conversation: "Ctrl+Shift+E"
+
+# Recent items
 recent:
-  documents: []
-  conversations: []
-  searches: []
-  
+  documents:
+    max_items: 20
+    items: []
+    show_in_sidebar: true
+    grouping: "daily"  # daily, weekly, monthly
+    
+  conversations:
+    max_items: 15
+    items: []
+    show_in_sidebar: true
+    auto_save: true
+    
+  searches:
+    max_items: 10
+    items: []
+    save_searches: true
+    private_mode: false
+
 # User preferences
 preferences:
-  auto_save: true
-  auto_save_interval: 30  # minutes
-  confirm_on_exit: true
-  check_for_updates: false
+  general:
+    auto_save: true
+    auto_save_interval: 30  # minutes
+    confirm_on_exit: true
+    check_for_updates: false
+    start_minimized: false
+    minimize_to_tray: true
+    
+  notifications:
+    enabled: true
+    sound: true
+    duration: 5000  # ms
+    position: "bottom-right"  # top-left, top-right, bottom-left, bottom-right
+    types:
+      processing_complete: true
+      error_occurred: true
+      export_complete: true
+      update_available: false
+      
+  privacy:
+    remember_session: true
+    clear_history_on_exit: false
+    do_not_track: true
+    analytics: false
+    
+  advanced:
+    developer_tools: false
+    experimental_features: false
+    verbose_logging: false
+    debug_mode: false

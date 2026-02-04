@@ -1,0 +1,820 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-02-04",
+  "description": "Keyboard shortcuts configuration for cockatoo_v1",
+  
+  "profiles": {
+    "default": "Standard keyboard shortcuts",
+    "vscode": "Visual Studio Code style shortcuts",
+    "sublime": "Sublime Text style shortcuts",
+    "custom": "User customized shortcuts"
+  },
+  
+  "current_profile": "default",
+  
+  "shortcuts": {
+    "file_operations": {
+      "new_conversation": {
+        "default": "Ctrl+N",
+        "macos": "Cmd+N",
+        "description": "Create a new conversation",
+        "category": "file",
+        "enabled": true
+      },
+      "open_document": {
+        "default": "Ctrl+O",
+        "macos": "Cmd+O",
+        "description": "Open a document",
+        "category": "file",
+        "enabled": true
+      },
+      "save_conversation": {
+        "default": "Ctrl+S",
+        "macos": "Cmd+S",
+        "description": "Save current conversation",
+        "category": "file",
+        "enabled": true
+      },
+      "save_all": {
+        "default": "Ctrl+Shift+S",
+        "macos": "Cmd+Shift+S",
+        "description": "Save all conversations",
+        "category": "file",
+        "enabled": true
+      },
+      "export_conversation": {
+        "default": "Ctrl+E",
+        "macos": "Cmd+E",
+        "description": "Export current conversation",
+        "category": "file",
+        "enabled": true
+      },
+      "import_documents": {
+        "default": "Ctrl+I",
+        "macos": "Cmd+I",
+        "description": "Import documents",
+        "category": "file",
+        "enabled": true
+      },
+      "print": {
+        "default": "Ctrl+P",
+        "macos": "Cmd+P",
+        "description": "Print current document",
+        "category": "file",
+        "enabled": true
+      },
+      "close_tab": {
+        "default": "Ctrl+W",
+        "macos": "Cmd+W",
+        "description": "Close current tab",
+        "category": "file",
+        "enabled": true
+      },
+      "close_all_tabs": {
+        "default": "Ctrl+Shift+W",
+        "macos": "Cmd+Shift+W",
+        "description": "Close all tabs",
+        "category": "file",
+        "enabled": true
+      },
+      "quit": {
+        "default": "Ctrl+Q",
+        "macos": "Cmd+Q",
+        "description": "Quit application",
+        "category": "file",
+        "enabled": true
+      }
+    },
+    
+    "edit_operations": {
+      "undo": {
+        "default": "Ctrl+Z",
+        "macos": "Cmd+Z",
+        "description": "Undo last action",
+        "category": "edit",
+        "enabled": true
+      },
+      "redo": {
+        "default": "Ctrl+Y",
+        "macos": "Cmd+Shift+Z",
+        "description": "Redo last action",
+        "category": "edit",
+        "enabled": true
+      },
+      "cut": {
+        "default": "Ctrl+X",
+        "macos": "Cmd+X",
+        "description": "Cut selection",
+        "category": "edit",
+        "enabled": true
+      },
+      "copy": {
+        "default": "Ctrl+C",
+        "macos": "Cmd+C",
+        "description": "Copy selection",
+        "category": "edit",
+        "enabled": true
+      },
+      "paste": {
+        "default": "Ctrl+V",
+        "macos": "Cmd+V",
+        "description": "Paste from clipboard",
+        "category": "edit",
+        "enabled": true
+      },
+      "paste_without_formatting": {
+        "default": "Ctrl+Shift+V",
+        "macos": "Cmd+Shift+V",
+        "description": "Paste without formatting",
+        "category": "edit",
+        "enabled": true
+      },
+      "select_all": {
+        "default": "Ctrl+A",
+        "macos": "Cmd+A",
+        "description": "Select all text",
+        "category": "edit",
+        "enabled": true
+      },
+      "find": {
+        "default": "Ctrl+F",
+        "macos": "Cmd+F",
+        "description": "Find in document",
+        "category": "edit",
+        "enabled": true
+      },
+      "find_next": {
+        "default": "F3",
+        "macos": "Cmd+G",
+        "description": "Find next occurrence",
+        "category": "edit",
+        "enabled": true
+      },
+      "find_previous": {
+        "default": "Shift+F3",
+        "macos": "Cmd+Shift+G",
+        "description": "Find previous occurrence",
+        "category": "edit",
+        "enabled": true
+      },
+      "replace": {
+        "default": "Ctrl+H",
+        "macos": "Cmd+Alt+F",
+        "description": "Replace text",
+        "category": "edit",
+        "enabled": true
+      },
+      "goto_line": {
+        "default": "Ctrl+G",
+        "macos": "Cmd+G",
+        "description": "Go to line number",
+        "category": "edit",
+        "enabled": true
+      }
+    },
+    
+    "view_operations": {
+      "toggle_sidebar": {
+        "default": "Ctrl+B",
+        "macos": "Cmd+B",
+        "description": "Toggle sidebar visibility",
+        "category": "view",
+        "enabled": true
+      },
+      "toggle_right_sidebar": {
+        "default": "Ctrl+Shift+B",
+        "macos": "Cmd+Shift+B",
+        "description": "Toggle right sidebar visibility",
+        "category": "view",
+        "enabled": true
+      },
+      "toggle_fullscreen": {
+        "default": "F11",
+        "macos": "Cmd+Ctrl+F",
+        "description": "Toggle fullscreen mode",
+        "category": "view",
+        "enabled": true
+      },
+      "zoom_in": {
+        "default": "Ctrl++",
+        "macos": "Cmd++",
+        "description": "Zoom in",
+        "category": "view",
+        "enabled": true
+      },
+      "zoom_out": {
+        "default": "Ctrl+-",
+        "macos": "Cmd+-",
+        "description": "Zoom out",
+        "category": "view",
+        "enabled": true
+      },
+      "reset_zoom": {
+        "default": "Ctrl+0",
+        "macos": "Cmd+0",
+        "description": "Reset zoom to 100%",
+        "category": "view",
+        "enabled": true
+      },
+      "toggle_dark_mode": {
+        "default": "Ctrl+Shift+D",
+        "macos": "Cmd+Shift+D",
+        "description": "Toggle dark/light mode",
+        "category": "view",
+        "enabled": true
+      },
+      "refresh_view": {
+        "default": "F5",
+        "macos": "Cmd+R",
+        "description": "Refresh current view",
+        "category": "view",
+        "enabled": true
+      },
+      "toggle_preview": {
+        "default": "Ctrl+Shift+P",
+        "macos": "Cmd+Shift+P",
+        "description": "Toggle document preview",
+        "category": "view",
+        "enabled": true
+      }
+    },
+    
+    "navigation": {
+      "next_tab": {
+        "default": "Ctrl+Tab",
+        "macos": "Ctrl+Tab",
+        "description": "Switch to next tab",
+        "category": "navigation",
+        "enabled": true
+      },
+      "previous_tab": {
+        "default": "Ctrl+Shift+Tab",
+        "macos": "Ctrl+Shift+Tab",
+        "description": "Switch to previous tab",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_1": {
+        "default": "Ctrl+1",
+        "macos": "Cmd+1",
+        "description": "Go to tab 1",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_2": {
+        "default": "Ctrl+2",
+        "macos": "Cmd+2",
+        "description": "Go to tab 2",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_3": {
+        "default": "Ctrl+3",
+        "macos": "Cmd+3",
+        "description": "Go to tab 3",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_4": {
+        "default": "Ctrl+4",
+        "macos": "Cmd+4",
+        "description": "Go to tab 4",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_5": {
+        "default": "Ctrl+5",
+        "macos": "Cmd+5",
+        "description": "Go to tab 5",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_6": {
+        "default": "Ctrl+6",
+        "macos": "Cmd+6",
+        "description": "Go to tab 6",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_7": {
+        "default": "Ctrl+7",
+        "macos": "Cmd+7",
+        "description": "Go to tab 7",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_8": {
+        "default": "Ctrl+8",
+        "macos": "Cmd+8",
+        "description": "Go to tab 8",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_tab_9": {
+        "default": "Ctrl+9",
+        "macos": "Cmd+9",
+        "description": "Go to tab 9",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_last_tab": {
+        "default": "Ctrl+0",
+        "macos": "Cmd+0",
+        "description": "Go to last tab",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_documents": {
+        "default": "Ctrl+Shift+1",
+        "macos": "Cmd+Shift+1",
+        "description": "Go to documents view",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_conversations": {
+        "default": "Ctrl+Shift+2",
+        "macos": "Cmd+Shift+2",
+        "description": "Go to conversations view",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_search": {
+        "default": "Ctrl+Shift+3",
+        "macos": "Cmd+Shift+3",
+        "description": "Go to search view",
+        "category": "navigation",
+        "enabled": true
+      },
+      "go_to_settings": {
+        "default": "Ctrl+Shift+4",
+        "macos": "Cmd+Shift+4",
+        "description": "Go to settings",
+        "category": "navigation",
+        "enabled": true
+      }
+    },
+    
+    "search_operations": {
+      "quick_search": {
+        "default": "Ctrl+K",
+        "macos": "Cmd+K",
+        "description": "Open quick search",
+        "category": "search",
+        "enabled": true
+      },
+      "search_documents": {
+        "default": "Ctrl+Shift+F",
+        "macos": "Cmd+Shift+F",
+        "description": "Search in documents",
+        "category": "search",
+        "enabled": true
+      },
+      "search_conversations": {
+        "default": "Ctrl+Shift+C",
+        "macos": "Cmd+Shift+C",
+        "description": "Search in conversations",
+        "category": "search",
+        "enabled": true
+      },
+      "advanced_search": {
+        "default": "Ctrl+Shift+A",
+        "macos": "Cmd+Shift+A",
+        "description": "Open advanced search",
+        "category": "search",
+        "enabled": true
+      },
+      "find_in_files": {
+        "default": "Ctrl+Shift+H",
+        "macos": "Cmd+Shift+H",
+        "description": "Find in files",
+        "category": "search",
+        "enabled": true
+      },
+      "replace_in_files": {
+        "default": "Ctrl+Shift+R",
+        "macos": "Cmd+Shift+R",
+        "description": "Replace in files",
+        "category": "search",
+        "enabled": true
+      }
+    },
+    
+    "ai_operations": {
+      "ask_ai": {
+        "default": "Ctrl+Enter",
+        "macos": "Cmd+Enter",
+        "description": "Send question to AI",
+        "category": "ai",
+        "enabled": true
+      },
+      "regenerate_response": {
+        "default": "Ctrl+Shift+R",
+        "macos": "Cmd+Shift+R",
+        "description": "Regenerate AI response",
+        "category": "ai",
+        "enabled": true
+      },
+      "stop_generation": {
+        "default": "Esc",
+        "macos": "Esc",
+        "description": "Stop AI generation",
+        "category": "ai",
+        "enabled": true
+      },
+      "copy_response": {
+        "default": "Ctrl+Shift+C",
+        "macos": "Cmd+Shift+C",
+        "description": "Copy AI response",
+        "category": "ai",
+        "enabled": true
+      },
+      "clear_conversation": {
+        "default": "Ctrl+Shift+Delete",
+        "macos": "Cmd+Shift+Delete",
+        "description": "Clear conversation",
+        "category": "ai",
+        "enabled": true
+      },
+      "toggle_ai_settings": {
+        "default": "Ctrl+Shift+M",
+        "macos": "Cmd+Shift+M",
+        "description": "Toggle AI settings panel",
+        "category": "ai",
+        "enabled": true
+      },
+      "summarize_document": {
+        "default": "Ctrl+Shift+S",
+        "macos": "Cmd+Shift+S",
+        "description": "Summarize current document",
+        "category": "ai",
+        "enabled": true
+      },
+      "explain_selection": {
+        "default": "Ctrl+Shift+E",
+        "macos": "Cmd+Shift+E",
+        "description": "Explain selected text",
+        "category": "ai",
+        "enabled": true
+      }
+    },
+    
+    "document_operations": {
+      "new_document": {
+        "default": "Ctrl+Shift+N",
+        "macos": "Cmd+Shift+N",
+        "description": "Create new document",
+        "category": "document",
+        "enabled": true
+      },
+      "open_document_folder": {
+        "default": "Ctrl+Shift+O",
+        "macos": "Cmd+Shift+O",
+        "description": "Open document folder",
+        "category": "document",
+        "enabled": true
+      },
+      "rename_document": {
+        "default": "F2",
+        "macos": "Enter",
+        "description": "Rename selected document",
+        "category": "document",
+        "enabled": true
+      },
+      "delete_document": {
+        "default": "Delete",
+        "macos": "Cmd+Backspace",
+        "description": "Delete selected document",
+        "category": "document",
+        "enabled": true
+      },
+      "move_document": {
+        "default": "Ctrl+M",
+        "macos": "Cmd+M",
+        "description": "Move document to folder",
+        "category": "document",
+        "enabled": true
+      },
+      "duplicate_document": {
+        "default": "Ctrl+D",
+        "macos": "Cmd+D",
+        "description": "Duplicate document",
+        "category": "document",
+        "enabled": true
+      },
+      "preview_document": {
+        "default": "Space",
+        "macos": "Space",
+        "description": "Preview document",
+        "category": "document",
+        "enabled": true
+      },
+      "toggle_document_view": {
+        "default": "Ctrl+Shift+V",
+        "macos": "Cmd+Shift+V",
+        "description": "Toggle document view mode",
+        "category": "document",
+        "enabled": true
+      },
+      "refresh_document_list": {
+        "default": "F5",
+        "macos": "Cmd+R",
+        "description": "Refresh document list",
+        "category": "document",
+        "enabled": true
+      }
+    },
+    
+    "formatting": {
+      "bold": {
+        "default": "Ctrl+B",
+        "macos": "Cmd+B",
+        "description": "Make text bold",
+        "category": "formatting",
+        "enabled": true
+      },
+      "italic": {
+        "default": "Ctrl+I",
+        "macos": "Cmd+I",
+        "description": "Make text italic",
+        "category": "formatting",
+        "enabled": true
+      },
+      "underline": {
+        "default": "Ctrl+U",
+        "macos": "Cmd+U",
+        "description": "Underline text",
+        "category": "formatting",
+        "enabled": true
+      },
+      "strikethrough": {
+        "default": "Ctrl+Shift+S",
+        "macos": "Cmd+Shift+S",
+        "description": "Strikethrough text",
+        "category": "formatting",
+        "enabled": true
+      },
+      "code": {
+        "default": "Ctrl+`",
+        "macos": "Cmd+`",
+        "description": "Format as code",
+        "category": "formatting",
+        "enabled": true
+      },
+      "link": {
+        "default": "Ctrl+K",
+        "macos": "Cmd+K",
+        "description": "Insert link",
+        "category": "formatting",
+        "enabled": true
+      },
+      "unordered_list": {
+        "default": "Ctrl+Shift+U",
+        "macos": "Cmd+Shift+U",
+        "description": "Insert unordered list",
+        "category": "formatting",
+        "enabled": true
+      },
+      "ordered_list": {
+        "default": "Ctrl+Shift+O",
+        "macos": "Cmd+Shift+O",
+        "description": "Insert ordered list",
+        "category": "formatting",
+        "enabled": true
+      },
+      "blockquote": {
+        "default": "Ctrl+Shift+B",
+        "macos": "Cmd+Shift+B",
+        "description": "Insert blockquote",
+        "category": "formatting",
+        "enabled": true
+      },
+      "heading_1": {
+        "default": "Ctrl+1",
+        "macos": "Cmd+1",
+        "description": "Apply heading 1",
+        "category": "formatting",
+        "enabled": true
+      },
+      "heading_2": {
+        "default": "Ctrl+2",
+        "macos": "Cmd+2",
+        "description": "Apply heading 2",
+        "category": "formatting",
+        "enabled": true
+      },
+      "heading_3": {
+        "default": "Ctrl+3",
+        "macos": "Cmd+3",
+        "description": "Apply heading 3",
+        "category": "formatting",
+        "enabled": true
+      }
+    },
+    
+    "system": {
+      "open_command_palette": {
+        "default": "Ctrl+Shift+P",
+        "macos": "Cmd+Shift+P",
+        "description": "Open command palette",
+        "category": "system",
+        "enabled": true
+      },
+      "open_devtools": {
+        "default": "F12",
+        "macos": "Cmd+Alt+I",
+        "description": "Open developer tools",
+        "category": "system",
+        "enabled": true
+      },
+      "reload_application": {
+        "default": "Ctrl+Shift+R",
+        "macos": "Cmd+Shift+R",
+        "description": "Reload application",
+        "category": "system",
+        "enabled": true
+      },
+      "open_settings": {
+        "default": "Ctrl+,",
+        "macos": "Cmd+,",
+        "description": "Open settings",
+        "category": "system",
+        "enabled": true
+      },
+      "open_shortcuts": {
+        "default": "Ctrl+Shift+,",
+        "macos": "Cmd+Shift+,",
+        "description": "Open shortcuts editor",
+        "category": "system",
+        "enabled": true
+      },
+      "help": {
+        "default": "F1",
+        "macos": "Cmd+?",
+        "description": "Open help",
+        "category": "system",
+        "enabled": true
+      },
+      "about": {
+        "default": "Ctrl+Shift+A",
+        "macos": "Cmd+Shift+A",
+        "description": "Show about dialog",
+        "category": "system",
+        "enabled": true
+      }
+    },
+    
+    "media": {
+      "play_pause": {
+        "default": "Space",
+        "macos": "Space",
+        "description": "Play/pause media",
+        "category": "media",
+        "enabled": true
+      },
+      "volume_up": {
+        "default": "Up",
+        "macos": "Up",
+        "description": "Increase volume",
+        "category": "media",
+        "enabled": true
+      },
+      "volume_down": {
+        "default": "Down",
+        "macos": "Down",
+        "description": "Decrease volume",
+        "category": "media",
+        "enabled": true
+      },
+      "mute": {
+        "default": "Ctrl+M",
+        "macos": "Cmd+M",
+        "description": "Mute/unmute",
+        "category": "media",
+        "enabled": true
+      },
+      "next_track": {
+        "default": "Ctrl+Right",
+        "macos": "Cmd+Right",
+        "description": "Next track",
+        "category": "media",
+        "enabled": true
+      },
+      "previous_track": {
+        "default": "Ctrl+Left",
+        "macos": "Cmd+Left",
+        "description": "Previous track",
+        "category": "media",
+        "enabled": true
+      }
+    }
+  },
+  
+  "profile_configs": {
+    "vscode": {
+      "save_conversation": "Ctrl+S",
+      "save_all": "Ctrl+K S",
+      "find": "Ctrl+F",
+      "replace": "Ctrl+H",
+      "toggle_terminal": "Ctrl+`",
+      "command_palette": "Ctrl+Shift+P",
+      "goto_line": "Ctrl+G"
+    },
+    
+    "sublime": {
+      "save_conversation": "Ctrl+S",
+      "save_all": "Ctrl+Shift+S",
+      "find": "Ctrl+F",
+      "find_in_files": "Ctrl+Shift+F",
+      "goto_symbol": "Ctrl+R",
+      "goto_line": "Ctrl+G",
+      "command_palette": "Ctrl+Shift+P"
+    },
+    
+    "custom": {}
+  },
+  
+  "contexts": {
+    "global": [
+      "open_command_palette",
+      "open_settings",
+      "help",
+      "quit"
+    ],
+    
+    "editor": [
+      "undo",
+      "redo",
+      "cut",
+      "copy",
+      "paste",
+      "select_all",
+      "find",
+      "replace",
+      "goto_line"
+    ],
+    
+    "chat": [
+      "ask_ai",
+      "stop_generation",
+      "copy_response",
+      "clear_conversation",
+      "regenerate_response"
+    ],
+    
+    "document_view": [
+      "new_document",
+      "open_document",
+      "rename_document",
+      "delete_document",
+      "preview_document",
+      "refresh_document_list"
+    ],
+    
+    "navigation": [
+      "next_tab",
+      "previous_tab",
+      "go_to_tab_1",
+      "go_to_tab_2",
+      "go_to_tab_3",
+      "toggle_sidebar"
+    ]
+  },
+  
+  "conflicts": [
+    {
+      "shortcut": "Ctrl+B",
+      "conflicts_with": ["toggle_sidebar", "bold"],
+      "resolution": "bold takes precedence in editor, toggle_sidebar elsewhere"
+    },
+    {
+      "shortcut": "Ctrl+K",
+      "conflicts_with": ["quick_search", "link"],
+      "resolution": "quick_search in global context, link in editor"
+    }
+  ],
+  
+  "validation": {
+    "allow_custom_shortcuts": true,
+    "validate_on_save": true,
+    "warn_on_conflict": true,
+    "auto_resolve_conflicts": false,
+    "backup_before_change": true
+  },
+  
+  "accessibility": {
+    "sticky_keys": false,
+    "slow_keys": false,
+    "bounce_keys": false,
+    "mouse_keys": false,
+    "keyboard_repeat_delay": 500,
+    "keyboard_repeat_rate": 30
+  },
+  
+  "metadata": {
+    "created": "2026-02-04",
+    "modified": "2026-02-04",
+    "created_by": "system",
+    "modified_by": "system",
+    "compatible_with": "cockatoo_v1 >= 1.0.0"
+  }
+}
