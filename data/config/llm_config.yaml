@@ -1,6 +1,7 @@
 # cockatoo_v1 LLM Configuration
-# Dedicated configuration file for Language Model settings
 # Version: 1.0.0
+# Dedicated configuration file for Language Model settings
+
 
 # Supported LLM Providers
 providers:
