@@ -64,7 +64,9 @@ coverage.xml
 [0-9]*.txt
 *complete*tracker*.py
 *complete*structure*.py
-*check_progress.py
+*check_progress*.py
+*database_debug_report*.json
+
 
 # Development file patterns
 *tracker*.py
@@ -92,6 +94,8 @@ smart_validation_report.json
 *task_details*.json
 *_report_*.json
 *_report_*.txt
+*debugger*.py
+
 
 # User-specific configuration overrides
 data/config/*.local.yaml
@@ -104,6 +108,7 @@ data/config/local_*.json
 data/database/
 !data/config/
 !data/database/migrations/
+
 
 # Application logs
 data/logs/
