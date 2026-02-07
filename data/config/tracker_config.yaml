@@ -1,0 +1,607 @@
+# Cockatoo_v1 Configuration Tracker
+# Version: 1.0.0
+# Main configuration file for tracking and managing configuration changes
+
+# ============================================
+# TRACKING SETTINGS
+# ============================================
+tracking:
+  # Enable/disable tracking
+  enabled: true
+  
+  # Automatic tracking
+  auto_track: true
+  auto_track_on_startup: true
+  auto_track_on_exit: true
+  
+  # Tracking intervals
+  track_interval_minutes: 5
+  min_interval_seconds: 30
+  max_interval_hours: 24
+  
+  # What to track
+  track_file_changes: true
+  track_size_changes: true
+  track_hash_changes: true
+  track_metadata_changes: true
+  track_permission_changes: false
+  
+  # File patterns to track
+  include_patterns:
+    - "*.yaml"
+    - "*.yml"
+    - "*.json"
+    - "*.py"
+    - "*.txt"
+    - "*.ini"
+    - "*.cfg"
+  
+  exclude_patterns:
+    - "*.tmp"
+    - "*.temp"
+    - "*.bak"
+    - "*.backup"
+    - "*~"
+    - ".git/*"
+    - "__pycache__/*"
+    - "*.log"
+  
+  # Directories to monitor
+  monitored_directories:
+    - "data/config"
+    - "src/core"
+    - "src/database"
+    - "src/utils"
+  
+  ignore_directories:
+    - ".git"
+    - ".venv"
+    - "venv"
+    - "__pycache__"
+    - "node_modules"
+    - "dist"
+    - "build"
+    - ".pytest_cache"
+
+# ============================================
+# BACKUP SETTINGS
+# ============================================
+backup:
+  # Backup configuration
+  enabled: true
+  backup_on_change: true
+  backup_on_startup: false
+  backup_on_exit: false
+  
+  # Backup retention
+  max_backups_per_file: 10
+  max_total_backups: 100
+  backup_retention_days: 30
+  
+  # Backup organization
+  organize_by_date: true
+  date_format: "%Y/%m/%d"
+  organize_by_type: true
+  backup_naming_convention: "{filename}_{timestamp}{extension}"
+  
+  # Compression
+  compress_backups: false
+  compression_level: 6
+  compression_format: "gz"  # gz, bz2, xz, zip
+  
+  # Backup locations
+  primary_backup_dir: "data/config/backups"
+  secondary_backup_dir: null
+  cloud_backup_enabled: false
+  
+  # Backup verification
+  verify_backups: true
+  verify_hash: true
+  verify_size: true
+  verify_permissions: false
+
+# ============================================
+# VERSION CONTROL SETTINGS
+# ============================================
+version_control:
+  # Versioning
+  enable_versioning: true
+  auto_increment_version: true
+  version_format: "major.minor.patch"
+  version_schema: "semver"
+  
+  # Version tags
+  tag_stable_versions: true
+  tag_beta_versions: false
+  tag_development_versions: true
+  
+  # Version history
+  keep_version_history: true
+  max_versions_to_keep: 50
+  prune_old_versions: true
+  prune_older_than_days: 90
+  
+  # Version metadata
+  include_changelog: true
+  include_commit_messages: false
+  include_author_info: true
+  include_timestamp: true
+
+# ============================================
+# CHANGE DETECTION SETTINGS
+# ============================================
+change_detection:
+  # Detection methods
+  detect_by_hash: true
+  detect_by_size: true
+  detect_by_mtime: true
+  detect_by_content: false  # Slower but more accurate
+  
+  # Change thresholds
+  min_change_size_bytes: 1
+  ignore_whitespace_changes: true
+  ignore_case_changes: false
+  ignore_comment_changes: true
+  
+  # Notification thresholds
+  notify_on_major_changes: true
+  notify_on_minor_changes: false
+  notify_on_patch_changes: false
+  
+  # Change classification
+  classify_changes: true
+  major_change_patterns:
+    - "version.*changed"
+    - "api.*changed"
+    - "database.*schema"
+    - "security.*settings"
+  
+  minor_change_patterns:
+    - "added.*feature"
+    - "modified.*behavior"
+    - "updated.*dependency"
+  
+  patch_change_patterns:
+    - "fixed.*bug"
+    - "typo.*corrected"
+    - "format.*changed"
+
+# ============================================
+# NOTIFICATION SETTINGS
+# ============================================
+notifications:
+  # Notification channels
+  console_notifications: true
+  log_file_notifications: true
+  desktop_notifications: false
+  email_notifications: false
+  webhook_notifications: false
+  
+  # Notification levels
+  notify_on_success: false
+  notify_on_info: false
+  notify_on_warning: true
+  notify_on_error: true
+  notify_on_critical: true
+  
+  # Notification triggers
+  on_config_change: true
+  on_backup_created: false
+  on_backup_failed: true
+  on_version_change: true
+  on_integrity_failure: true
+  on_space_low: true
+  
+  # Notification content
+  include_file_details: true
+  include_change_diff: false
+  include_backup_location: true
+  include_timestamp: true
+  include_severity: true
+  
+  # Rate limiting
+  notification_cooldown_seconds: 300
+  max_notifications_per_hour: 20
+  suppress_duplicate_notifications: true
+
+# ============================================
+# SECURITY SETTINGS
+# ============================================
+security:
+  # Integrity checking
+  validate_configs: true
+  check_integrity_on_load: true
+  check_integrity_on_save: true
+  verify_config_signatures: false
+  
+  # Hash algorithms
+  primary_hash_algorithm: "sha256"
+  fallback_hash_algorithm: "md5"
+  hash_salt: ""  # Optional salt for hashing
+  
+  # Encryption
+  encrypt_backups: false
+  encryption_algorithm: "AES-256-GCM"
+  encryption_key_file: "data/config/keys/backup.key"
+  
+  # Access control
+  restrict_access: false
+  allowed_users: []
+  allowed_groups: []
+  file_permissions: "600"  # Unix permissions
+  
+  # Audit logging
+  enable_audit_log: true
+  audit_log_file: "data/config/logs/audit.log"
+  log_access_attempts: true
+  log_config_changes: true
+  log_backup_operations: true
+  
+  # Security policies
+  validate_file_ownership: false
+  check_file_integrity: true
+  prevent_unauthorized_changes: false
+  quarantine_suspicious_files: false
+
+# ============================================
+# PERFORMANCE SETTINGS
+# ============================================
+performance:
+  # Tracking performance
+  async_tracking: true
+  batch_operations: true
+  batch_size: 10
+  max_concurrent_operations: 5
+  
+  # Caching
+  cache_results: true
+  cache_ttl_seconds: 300
+  max_cache_size_mb: 100
+  cache_eviction_policy: "lru"  # lru, fifo, random
+  
+  # Resource limits
+  max_memory_usage_mb: 512
+  max_cpu_percent: 50
+  io_timeout_seconds: 30
+  operation_timeout_seconds: 60
+  
+  # Optimization
+  lazy_loading: true
+  incremental_scanning: true
+  parallel_processing: true
+  compression_enabled: false
+  
+  # Monitoring
+  monitor_performance: true
+  performance_log_file: "data/config/logs/performance.log"
+  log_slow_operations: true
+  slow_operation_threshold_ms: 1000
+
+# ============================================
+# STORAGE MANAGEMENT
+# ============================================
+storage:
+  # Storage limits
+  max_storage_mb: 1024
+  max_files_count: 1000
+  max_backup_size_mb: 500
+  
+  # Cleanup policies
+  auto_cleanup: true
+  cleanup_interval_hours: 24
+  cleanup_strategy: "oldest_first"  # oldest_first, largest_first, least_accessed
+  
+  # Retention policies
+  keep_minimum_backups: 3
+  keep_daily_backups_days: 7
+  keep_weekly_backups_weeks: 4
+  keep_monthly_backups_months: 12
+  
+  # Space management
+  low_space_threshold_percent: 80
+  critical_space_threshold_percent: 90
+  auto_expand_storage: false
+  
+  # Storage locations
+  primary_storage: "data/config"
+  backup_storage: "data/config/backups"
+  temp_storage: "data/config/temp"
+  archive_storage: "data/config/archive"
+
+# ============================================
+# REPORTING SETTINGS
+# ============================================
+reporting:
+  # Report generation
+  generate_reports: true
+  report_interval: "daily"  # hourly, daily, weekly, monthly
+  auto_generate_reports: true
+  
+  # Report types
+  include_change_report: true
+  include_backup_report: true
+  include_integrity_report: true
+  include_performance_report: false
+  include_security_report: false
+  
+  # Report formats
+  report_formats:
+    - "json"
+    - "yaml"
+    - "html"
+    - "txt"
+  default_report_format: "json"
+  
+  # Report content
+  include_statistics: true
+  include_trends: true
+  include_recommendations: true
+  include_charts: false
+  include_details: true
+  
+  # Report delivery
+  save_reports: true
+  reports_directory: "data/config/reports"
+  send_reports_via_email: false
+  upload_reports_to_cloud: false
+
+# ============================================
+# INTEGRATION SETTINGS
+# ============================================
+integrations:
+  # Version control systems
+  git_integration: true
+  git_auto_commit: false
+  git_commit_message_template: "Config update: {changes}"
+  git_branch: "main"
+  
+  # Cloud storage
+  cloud_storage_enabled: false
+  cloud_providers:
+    aws_s3: false
+    google_drive: false
+    azure_blob: false
+    dropbox: false
+  
+  # Monitoring systems
+  prometheus_integration: false
+  grafana_integration: false
+  datadog_integration: false
+  
+  # Notification services
+  slack_integration: false
+  discord_integration: false
+  teams_integration: false
+  webhook_endpoints: []
+  
+  # External tools
+  external_validators: []
+  external_backup_tools: []
+  external_monitoring_tools: []
+
+# ============================================
+# VALIDATION SETTINGS
+# ============================================
+validation:
+  # Schema validation
+  validate_against_schema: true
+  config_schemas:
+    app_config: "schemas/app_config_schema.yaml"
+    llm_config: "schemas/llm_config_schema.yaml"
+    ui_config: "schemas/ui_config_schema.yaml"
+    user_config: "schemas/user_config_schema.yaml"
+  
+  # Content validation
+  validate_yaml_syntax: true
+  validate_json_syntax: true
+  validate_python_syntax: false
+  check_required_fields: true
+  
+  # Value validation
+  validate_values: true
+  validate_ranges: true
+  validate_enums: true
+  validate_patterns: true
+  
+  # Cross-validation
+  validate_references: true
+  check_circular_dependencies: true
+  validate_inter_config_consistency: true
+  
+  # Validation behavior
+  fail_fast: false
+  collect_all_errors: true
+  auto_correct_minor_issues: false
+  validation_timeout_seconds: 30
+
+# ============================================
+# RECOVERY SETTINGS
+# ============================================
+recovery:
+  # Auto-recovery
+  auto_recovery_enabled: true
+  recover_on_corruption: true
+  recover_on_deletion: true
+  recover_on_perm_change: false
+  
+  # Recovery sources
+  primary_recovery_source: "backups"
+  secondary_recovery_source: "git"
+  fallback_recovery_source: "manual"
+  
+  # Recovery verification
+  verify_recovery: true
+  test_recovered_configs: true
+  integrity_check_after_recovery: true
+  
+  # Recovery policies
+  max_recovery_attempts: 3
+  recovery_timeout_minutes: 10
+  notify_on_recovery: true
+  log_recovery_operations: true
+  
+  # Disaster recovery
+  disaster_recovery_plan: "basic"
+  dr_backup_location: null
+  dr_restore_procedure: "manual"
+
+# ============================================
+# LOGGING SETTINGS
+# ============================================
+logging:
+  # Log levels
+  console_level: "INFO"
+  file_level: "DEBUG"
+  audit_level: "INFO"
+  error_level: "ERROR"
+  
+  # Log files
+  main_log_file: "data/config/logs/tracker.log"
+  error_log_file: "data/config/logs/tracker_error.log"
+  audit_log_file: "data/config/logs/tracker_audit.log"
+  debug_log_file: "data/config/logs/tracker_debug.log"
+  
+  # Log rotation
+  log_rotation: true
+  max_log_size_mb: 10
+  backup_count: 5
+  compress_old_logs: true
+  rotate_on_startup: true
+  
+  # Log format
+  log_format: "detailed"  # simple, detailed, json
+  include_timestamp: true
+  include_process_id: true
+  include_thread_id: false
+  include_function_name: true
+  
+  # Log content
+  log_config_changes: true
+  log_backup_operations: true
+  log_validation_results: true
+  log_performance_metrics: true
+  log_security_events: true
+
+# ============================================
+# METADATA
+# ============================================
+metadata:
+  # Tracker metadata
+  tracker_version: "1.0.0"
+  tracker_name: "Cockatoo_v1 Configuration Tracker"
+  tracker_description: "Tracks and manages configuration file changes with backup and versioning"
+  
+  # Creation info
+  created_at: "2024-02-04T00:00:00Z"
+  created_by: "system"
+  last_modified: "2024-02-04T00:00:00Z"
+  modified_by: "system"
+  
+  # System info
+  compatible_with: "Cockatoo_v1 >= 1.0.0"
+  python_version: ">=3.10"
+  operating_systems:
+    - "windows"
+    - "linux"
+    - "macos"
+  
+  # Dependencies
+  required_packages:
+    - "pyyaml>=6.0"
+    - "hashlib"
+    - "datetime"
+  
+  # Links
+  documentation_url: ""
+  support_url: ""
+  repository_url: ""
+
+# ============================================
+# CUSTOMIZATION SETTINGS
+# ============================================
+customization:
+  # UI customization (if applicable)
+  theme: "default"
+  color_scheme: "blue"
+  font_size: 12
+  
+  # Behavior customization
+  confirm_before_actions: true
+  show_progress_bars: true
+  show_summary_reports: true
+  verbose_output: false
+  
+  # Custom scripts
+  pre_track_scripts: []
+  post_track_scripts: []
+  pre_backup_scripts: []
+  post_backup_scripts: []
+  validation_scripts: []
+  recovery_scripts: []
+  
+  # Custom rules
+  custom_validation_rules: []
+  custom_backup_rules: []
+  custom_notification_rules: []
+  custom_cleanup_rules: []
+
+# ============================================
+# EXPERIMENTAL FEATURES
+# ============================================
+experimental:
+  # Experimental features
+  enable_experimental: false
+  experimental_features:
+    - "ai_analysis"
+    - "predictive_backup"
+    - "auto_tuning"
+    - "blockchain_verification"
+  
+  # AI integration
+  ai_analysis_enabled: false
+  ai_model: "gpt-3.5-turbo"
+  analyze_config_patterns: false
+  suggest_optimizations: false
+  
+  # Predictive features
+  predictive_backup_enabled: false
+  change_prediction_threshold: 0.7
+  learning_rate: 0.01
+  
+  # Advanced monitoring
+  real_time_monitoring: false
+  anomaly_detection: false
+  trend_analysis: false
+  
+  # Beta features
+  beta_features_enabled: false
+  unstable_apis_enabled: false
+
+# ============================================
+# DEBUG SETTINGS
+# ============================================
+debug:
+  # Debug modes
+  enable_debug: false
+  debug_level: "info"
+  trace_operations: false
+  
+  # Debug output
+  print_debug_info: false
+  save_debug_files: false
+  debug_files_directory: "data/config/debug"
+  
+  # Performance profiling
+  profile_operations: false
+  profile_output_format: "text"
+  profile_sampling_interval: 0.001
+  
+  # Testing
+  test_mode: false
+  mock_operations: false
+  simulate_errors: false
+  
+  # Development
+  developer_mode: false
+  bypass_checks: false
+  skip_validations: false
