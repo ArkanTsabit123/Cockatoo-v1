@@ -1,0 +1,1038 @@
+# src/database/migrations/migration_manager.py
+
+"""
+Migration manager for Cockatoo database migrations.
+
+Main manager class that coordinates migration discovery, execution,
+rollback, and status tracking with atomic operations, progress reporting,
+and comprehensive error recovery.
+"""
+
+import sqlite3
+import time
+import json
+import traceback
+import threading
+import hashlib
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Any, Optional, Tuple, Callable
+import logging
+
+from .migration_config import MigrationConfig
+from .version_table import VersionTable
+from .migration_utils import (
+    backup_database, validate_database_integrity,
+    table_exists, log_migration_step, log_data_stats,
+    format_duration, create_temp_table, swap_tables,
+    execute_sql_script, load_migration_class, topological_sort
+)
+
+logger = logging.getLogger(__name__)
+
+
+class MigrationProgress:
+    """Represents migration progress for reporting."""
+    
+    def __init__(self, total_steps: int = 0):
+        self.total_steps = total_steps
+        self.current_step = 0
+        self.current_description = ""
+        self.start_time = time.time()
+        self.errors = []
+        self.warnings = []
+        self.lock = threading.Lock()
+    
+    def update(self, step: int, description: str) -> None:
+        """Update progress."""
+        with self.lock:
+            self.current_step = step
+            self.current_description = description
+    
+    def add_error(self, error: str) -> None:
+        """Add error."""
+        with self.lock:
+            self.errors.append(error)
+    
+    def add_warning(self, warning: str) -> None:
+        """Add warning."""
+        with self.lock:
+            self.warnings.append(warning)
+    
+    def get_percentage(self) -> float:
+        """Get completion percentage."""
+        with self.lock:
+            if self.total_steps == 0:
+                return 100.0
+            return (self.current_step / self.total_steps) * 100
+    
+    def get_elapsed_time(self) -> float:
+        """Get elapsed time in seconds."""
+        return time.time() - self.start_time
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        with self.lock:
+            return {
+                'total_steps': self.total_steps,
+                'current_step': self.current_step,
+                'current_description': self.current_description,
+                'percentage': self.get_percentage(),
+                'elapsed_seconds': self.get_elapsed_time(),
+                'errors': self.errors.copy(),
+                'warnings': self.warnings.copy(),
+                'is_complete': self.current_step >= self.total_steps
+            }
+
+
+class MigrationManager:
+    """
+    Manages database migrations with atomic operations and progress reporting.
+    """
+    
+    def __init__(self, config: Optional[MigrationConfig] = None) -> None:
+        """
+        Initialize migration manager.
+        
+        Args:
+            config: Migration configuration
+        """
+        self.config = config or MigrationConfig()
+        self.connection: Optional[sqlite3.Connection] = None
+        self.version_table: Optional[VersionTable] = None
+        self.progress_callback: Optional[Callable[[MigrationProgress], None]] = None
+        self.connection_lock = threading.Lock()
+        self.progress_lock = threading.Lock()
+        
+        log_level = getattr(logging, self.config.log_level.value.upper())
+        logging.basicConfig(
+            level=log_level,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+    
+    def set_progress_callback(self, callback: Callable[[MigrationProgress], None]) -> None:
+        """
+        Set callback for progress reporting.
+        
+        Args:
+            callback: Function to call with progress updates
+        """
+        with self.progress_lock:
+            self.progress_callback = callback
+    
+    def _report_progress(self, progress: MigrationProgress) -> None:
+        """Report progress if callback is set."""
+        with self.progress_lock:
+            if self.progress_callback:
+                try:
+                    self.progress_callback(progress)
+                except Exception as e:
+                    logger.error(f"Progress callback error: {e}")
+    
+    def connect(self) -> bool:
+        """
+        Establish database connection.
+        
+        Returns:
+            True if connection successful, False otherwise
+        """
+        with self.connection_lock:
+            try:
+                log_migration_step(
+                    "Establishing database connection",
+                    "INFO",
+                    {'database_path': self.config.database_path}
+                )
+                
+                self.connection = sqlite3.connect(
+                    self.config.database_path,
+                    timeout=self.config.timeout_seconds
+                )
+                
+                self.connection.row_factory = sqlite3.Row
+                self.connection.execute("PRAGMA foreign_keys = ON")
+                
+                self.version_table = VersionTable(self.connection)
+                
+                log_migration_step(
+                    "Database connection established",
+                    "INFO",
+                    {'database_path': self.config.database_path}
+                )
+                
+                return True
+                
+            except sqlite3.Error as e:
+                log_migration_step(
+                    "Failed to connect to database",
+                    "ERROR",
+                    {'database_path': self.config.database_path, 'error': str(e)}
+                )
+                return False
+    
+    def disconnect(self) -> None:
+        """Close database connection safely."""
+        with self.connection_lock:
+            if self.connection:
+                try:
+                    self.connection.close()
+                    log_migration_step("Database connection closed", "INFO")
+                except Exception as e:
+                    logger.error(f"Error closing connection: {e}")
+                finally:
+                    self.connection = None
+                    self.version_table = None
+    
+    def get_current_version(self) -> Optional[str]:
+        """
+        Get current database version.
+        
+        Returns:
+            Current version string or None if no migrations applied
+        """
+        if not self.connection and not self.connect():
+            return None
+        
+        try:
+            version = self.version_table.get_last_migration()
+            return version['version'] if version else None
+            
+        except Exception as e:
+            logger.error(f"Failed to get current version: {e}")
+            return None
+    
+    def get_available_migrations(self) -> List[Dict[str, Any]]:
+        """
+        Get list of all available migrations with details.
+        
+        Returns:
+            List of migration information dictionaries
+        """
+        try:
+            migration_files = self.config.get_migration_files()
+            migrations = []
+            
+            for file_path in migration_files:
+                try:
+                    version = self._extract_version_from_file(file_path)
+                    if not version:
+                        continue
+                    
+                    migration_class = load_migration_class(file_path)
+                    if migration_class:
+                        migration = migration_class()
+                        migrations.append({
+                            'version': version,
+                            'file_path': file_path,
+                            'description': migration.description,
+                            'dependencies': migration.dependencies,
+                            'is_breaking': migration.is_breaking,
+                            'has_down_method': hasattr(migration, 'down'),
+                            'estimated_duration': migration.estimate_duration()
+                        })
+                    else:
+                        migrations.append({
+                            'version': version,
+                            'file_path': file_path,
+                            'description': 'Unable to load migration',
+                            'dependencies': [],
+                            'is_breaking': False,
+                            'has_down_method': False,
+                            'error': 'Failed to load migration class'
+                        })
+                        
+                except Exception as e:
+                    logger.error(f"Failed to process migration file {file_path}: {e}")
+                    migrations.append({
+                        'version': 'unknown',
+                        'file_path': file_path,
+                        'error': str(e)
+                    })
+            
+            migrations.sort(key=lambda x: self._parse_version(x['version']))
+            return migrations
+            
+        except Exception as e:
+            logger.error(f"Failed to get available migrations: {e}")
+            return []
+    
+    def check_needs_migration(self) -> Dict[str, Any]:
+        """
+        Check if migration is needed.
+        
+        Returns:
+            Dictionary with migration needs analysis
+        """
+        if not self.connection and not self.connect():
+            return {'needs_migration': False, 'error': 'Database connection failed'}
+        
+        try:
+            available_migrations = self.get_available_migrations()
+            applied_migrations = self.version_table.get_applied_migrations()
+            
+            applied_versions = [m['version'] for m in applied_migrations]
+            available_versions = [m['version'] for m in available_migrations]
+            
+            pending_versions = [v for v in available_versions if v not in applied_versions]
+            pending_migrations = [m for m in available_migrations if m['version'] in pending_versions]
+            
+            breaking_changes = [m for m in pending_migrations if m.get('is_breaking', False)]
+            
+            dependency_issues = []
+            for migration in pending_migrations:
+                for dep in migration.get('dependencies', []):
+                    if dep not in applied_versions:
+                        dependency_issues.append({
+                            'migration': migration['version'],
+                            'missing_dependency': dep
+                        })
+            
+            total_estimated_time = sum(m.get('estimated_duration', 30) for m in pending_migrations)
+            
+            result = {
+                'needs_migration': len(pending_versions) > 0,
+                'current_version': self.get_current_version(),
+                'pending_count': len(pending_versions),
+                'pending_versions': pending_versions,
+                'breaking_changes_count': len(breaking_changes),
+                'breaking_changes': [m['version'] for m in breaking_changes],
+                'dependency_issues': dependency_issues,
+                'total_estimated_time_seconds': total_estimated_time,
+                'has_dependency_issues': len(dependency_issues) > 0,
+                'recommendation': 'Migration required' if pending_versions else 'Up to date'
+            }
+            
+            if breaking_changes:
+                result['recommendation'] += f" ({len(breaking_changes)} breaking changes)"
+            
+            log_migration_step("Migration needs check completed", "INFO", result)
+            return result
+            
+        except Exception as e:
+            error_result = {
+                'needs_migration': False,
+                'error': str(e),
+                'recommendation': 'Unable to determine migration needs'
+            }
+            log_migration_step("Migration needs check failed", "ERROR", error_result)
+            return error_result
+    
+    def validate_migration_chain(self) -> Tuple[bool, List[Dict[str, Any]]]:
+        """
+        Validate the entire migration chain for consistency.
+        
+        Returns:
+            Tuple of (is_valid, issues)
+        """
+        issues = []
+        
+        try:
+            available_migrations = self.get_available_migrations()
+            applied_migrations = self.version_table.get_applied_migrations()
+            
+            applied_versions = [m['version'] for m in applied_migrations]
+            available_versions = [m['version'] for m in available_migrations]
+            
+            missing_versions = [v for v in applied_versions if v not in available_versions]
+            for version in missing_versions:
+                issues.append({
+                    'type': 'missing_file',
+                    'version': version,
+                    'message': f'Migration file for version {version} is missing'
+                })
+            
+            for migration in available_migrations:
+                version = migration['version']
+                dependencies = migration.get('dependencies', [])
+                
+                for dep in dependencies:
+                    if dep not in available_versions:
+                        issues.append({
+                            'type': 'missing_dependency',
+                            'version': version,
+                            'dependency': dep,
+                            'message': f'Migration {version} depends on non-existent migration {dep}'
+                        })
+                
+                if version in dependencies:
+                    issues.append({
+                        'type': 'circular_dependency',
+                        'version': version,
+                        'message': f'Migration {version} depends on itself'
+                    })
+            
+            available_versions_sorted = sorted(available_versions, key=self._parse_version)
+            for i in range(1, len(available_versions_sorted)):
+                prev_version = available_versions_sorted[i-1]
+                curr_version = available_versions_sorted[i]
+                
+                prev_parts = self._parse_version(prev_version)
+                curr_parts = self._parse_version(curr_version)
+                
+                if curr_parts[2] - prev_parts[2] > 1 and curr_parts[0] == prev_parts[0] and curr_parts[1] == prev_parts[1]:
+                    issues.append({
+                        'type': 'version_gap',
+                        'prev_version': prev_version,
+                        'curr_version': curr_version,
+                        'message': f'Possible version gap between {prev_version} and {curr_version}'
+                    })
+            
+            if self.config.validation_level.value != 'none':
+                migration_files_dict = {}
+                for migration in available_migrations:
+                    if 'file_path' in migration and 'version' in migration:
+                        migration_files_dict[migration['version']] = migration['file_path']
+                
+                is_valid, checksum_issues = self.version_table.validate_checksums(migration_files_dict)
+                if not is_valid:
+                    issues.extend([
+                        {
+                            'type': 'checksum_mismatch',
+                            'version': issue.get('version'),
+                            'message': f'Checksum mismatch for migration {issue.get("version")}'
+                        }
+                        for issue in checksum_issues
+                    ])
+            
+            is_valid = len(issues) == 0
+            
+            log_migration_step(
+                "Migration chain validation completed",
+                "INFO" if is_valid else "WARNING",
+                {'is_valid': is_valid, 'issue_count': len(issues), 'issues': issues}
+            )
+            
+            return is_valid, issues
+            
+        except Exception as e:
+            log_migration_step(
+                "Migration chain validation failed",
+                "ERROR",
+                {'error': str(e)}
+            )
+            return False, [{'type': 'validation_error', 'message': str(e)}]
+    
+    def _resolve_migration_order(self, migrations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Resolve migration order using topological sort.
+        
+        Args:
+            migrations: List of migration dictionaries
+            
+        Returns:
+            Topologically sorted list of migrations
+        """
+        graph = {}
+        migration_map = {}
+        
+        for migration in migrations:
+            version = migration['version']
+            migration_map[version] = migration
+            graph[version] = migration.get('dependencies', [])
+        
+        try:
+            sorted_versions = topological_sort(graph)
+            return [migration_map[version] for version in sorted_versions if version in migration_map]
+        except ValueError as e:
+            logger.error(f"Failed to resolve migration order: {e}")
+            return migrations
+    
+    def migrate_to(self, target_version: Optional[str] = None, 
+                  dry_run: bool = False) -> Tuple[bool, str, MigrationProgress]:
+        """
+        Migrate to specific version with atomic operations.
+        
+        Args:
+            target_version: Target version to migrate to (None for latest)
+            dry_run: If True, only simulate migration
+            
+        Returns:
+            Tuple of (success, message, progress)
+        """
+        progress = MigrationProgress()
+        
+        try:
+            needs_check = self.check_needs_migration()
+            if not needs_check.get('needs_migration', False):
+                progress.total_steps = 1
+                progress.update(1, "No migrations needed")
+                self._report_progress(progress)
+                return True, "Database is already up to date", progress
+            
+            pending_migrations = self._get_pending_migrations(target_version)
+            pending_migrations = self._resolve_migration_order(pending_migrations)
+            
+            if not pending_migrations:
+                progress.total_steps = 1
+                progress.update(1, "No migrations to apply")
+                self._report_progress(progress)
+                return True, "No migrations to apply", progress
+            
+            breaking_changes = [m for m in pending_migrations if m.get('is_breaking', False)]
+            if breaking_changes and self.config.require_confirmation and not dry_run:
+                log_migration_step(
+                    "Breaking changes detected",
+                    "WARNING",
+                    {'breaking_versions': [m['version'] for m in breaking_changes]}
+                )
+            
+            progress.total_steps = len(pending_migrations) + 3
+            
+            progress.update(1, "Starting migration process")
+            self._report_progress(progress)
+            
+            if dry_run:
+                return self._execute_dry_run(pending_migrations, progress)
+            
+            return self._execute_migration_atomic(pending_migrations, progress)
+            
+        except Exception as e:
+            progress.add_error(f"Migration failed: {e}")
+            progress.update(progress.total_steps, f"Failed: {e}")
+            self._report_progress(progress)
+            
+            log_migration_step(
+                "Migration failed",
+                "ERROR",
+                {'error': str(e), 'traceback': traceback.format_exc()}
+            )
+            
+            return False, f"Migration failed: {e}", progress
+    
+    def _get_pending_migrations(self, target_version: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get list of pending migrations up to target version."""
+        try:
+            available_migrations = self.get_available_migrations()
+            applied_migrations = self.version_table.get_applied_migrations()
+            
+            applied_versions = [m['version'] for m in applied_migrations]
+            available_versions = [m['version'] for m in available_migrations]
+            
+            pending = []
+            for migration in available_migrations:
+                if migration['version'] not in applied_versions:
+                    if target_version:
+                        if migration['version'] == target_version:
+                            pending.append(migration)
+                            break
+                        elif self._parse_version(migration['version']) > self._parse_version(target_version):
+                            continue
+                    pending.append(migration)
+            
+            return pending
+            
+        except Exception as e:
+            logger.error(f"Failed to get pending migrations: {e}")
+            return []
+    
+    def _execute_dry_run(self, pending_migrations: List[Dict[str, Any]], 
+                        progress: MigrationProgress) -> Tuple[bool, str, MigrationProgress]:
+        """Execute dry run simulation."""
+        try:
+            for i, migration in enumerate(pending_migrations, 2):
+                progress.update(i, f"Would apply: {migration['version']} - {migration.get('description', '')}")
+                self._report_progress(progress)
+                time.sleep(0.1)
+            
+            progress.update(progress.total_steps, "Dry run completed")
+            self._report_progress(progress)
+            
+            message = f"Dry run: Would apply {len(pending_migrations)} migrations"
+            for migration in pending_migrations:
+                message += f"\n  - {migration['version']}: {migration.get('description', '')}"
+            
+            log_migration_step("Dry run completed", "INFO", {'migration_count': len(pending_migrations)})
+            return True, message, progress
+            
+        except Exception as e:
+            progress.add_error(f"Dry run failed: {e}")
+            progress.update(progress.total_steps, f"Dry run failed: {e}")
+            self._report_progress(progress)
+            return False, f"Dry run failed: {e}", progress
+    
+    def _execute_migration_atomic(self, pending_migrations: List[Dict[str, Any]],
+                                 progress: MigrationProgress) -> Tuple[bool, str, MigrationProgress]:
+        """Execute migrations with atomic guarantee using savepoints."""
+        backup_path = None
+        
+        try:
+            with self.connection_lock:
+                if not self.connection:
+                    self.connect()
+                
+                # Create a savepoint for the entire migration batch
+                savepoint_name = f"migration_batch_{int(time.time())}"
+                self.connection.execute(f"SAVEPOINT {savepoint_name}")
+                
+                progress.update(2, "Creating backup")
+                self._report_progress(progress)
+                
+                if self.config.create_backup:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_filename = f"migration_backup_{timestamp}.db"
+                    backup_path = Path(self.config.backup_location) / backup_filename
+                    
+                    if not backup_database(self.config.database_path, str(backup_path.parent), backup_filename):
+                        progress.add_warning("Backup creation failed, proceeding without backup")
+                        log_migration_step("Backup creation failed", "WARNING")
+                    else:
+                        log_migration_step(
+                            "Backup created",
+                            "INFO",
+                            {'backup_path': str(backup_path)}
+                        )
+                
+                progress.update(3, "Preparing migration environment")
+                self._report_progress(progress)
+                
+                for i, migration in enumerate(pending_migrations, 4):
+                    version = migration['version']
+                    description = migration.get('description', 'Unknown')
+                    
+                    progress.update(i, f"Applying migration: {version} - {description}")
+                    self._report_progress(progress)
+                    
+                    success, message = self._apply_single_migration_with_savepoint(migration, savepoint_name)
+                    if not success:
+                        progress.add_error(f"Migration {version} failed: {message}")
+                        
+                        log_migration_step(f"Migration {version} failed, rolling back batch", "ERROR")
+                        self.connection.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
+                        
+                        progress.update(progress.total_steps, f"Migration failed at version {version}")
+                        self._report_progress(progress)
+                        
+                        return False, f"Migration failed at version {version}: {message}", progress
+                
+                progress.update(progress.total_steps - 2, "Finalizing migration")
+                self._report_progress(progress)
+                
+                progress.update(progress.total_steps - 1, "Validating migration results")
+                self._report_progress(progress)
+                
+                if self.config.validation_level.value != 'none':
+                    self._validate_post_migration()
+                
+                # All migrations succeeded, release the savepoint
+                self.connection.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+                self.connection.commit()
+                
+                progress.update(progress.total_steps, "Migration completed successfully")
+                self._report_progress(progress)
+                
+                log_data_stats(self.connection)
+                
+                elapsed_time = format_duration(progress.get_elapsed_time())
+                message = f"Successfully applied {len(pending_migrations)} migrations in {elapsed_time}"
+                
+                log_migration_step(
+                    "Migration completed successfully",
+                    "INFO",
+                    {
+                        'applied_count': len(pending_migrations),
+                        'elapsed_time': elapsed_time,
+                        'backup_path': str(backup_path) if backup_path else None
+                    }
+                )
+                
+                return True, message, progress
+                
+        except Exception as e:
+            with self.connection_lock:
+                if self.connection:
+                    try:
+                        # Rollback to the savepoint if it exists
+                        self.connection.execute(f"ROLLBACK TO SAVEPOINT migration_batch")
+                        self.connection.execute(f"RELEASE SAVEPOINT migration_batch")
+                    except:
+                        # If savepoint doesn't exist, do a full rollback
+                        self.connection.rollback()
+            
+            progress.add_error(f"Atomic migration failed: {e}")
+            
+            log_migration_step("Migration failed", "ERROR", {'error': str(e)})
+            
+            progress.update(progress.total_steps, f"Migration failed: {e}")
+            self._report_progress(progress)
+            
+            return False, f"Migration failed: {e}", progress
+    
+    def _apply_single_migration_with_savepoint(self, migration_info: Dict[str, Any], 
+                                              batch_savepoint: str) -> Tuple[bool, str]:
+        """Apply a single migration with nested savepoint for rollback."""
+        try:
+            file_path = migration_info['file_path']
+            version = migration_info['version']
+            
+            migration_class = load_migration_class(file_path)
+            if not migration_class:
+                return False, f"Failed to load migration class for version {version}"
+            
+            migration = migration_class()
+            
+            for dep in migration.dependencies:
+                if not self.version_table.get_migration_status(dep) == 'applied':
+                    return False, f"Dependency {dep} not satisfied"
+            
+            if not self.version_table.record_migration_start(
+                version, migration_info.get('description', ''),
+                file_path
+            ):
+                return False, f"Failed to record migration start for version {version}"
+            
+            start_time = time.time()
+            
+            try:
+                # Create a nested savepoint for this specific migration
+                migration_savepoint = f"migration_{version}_{int(time.time())}"
+                self.connection.execute(f"SAVEPOINT {migration_savepoint}")
+                
+                if not migration.pre_upgrade(self.connection):
+                    self.connection.execute(f"ROLLBACK TO SAVEPOINT {migration_savepoint}")
+                    return False, "Pre-upgrade checks failed"
+                
+                if not migration.upgrade(self.connection):
+                    self.connection.execute(f"ROLLBACK TO SAVEPOINT {migration_savepoint}")
+                    return False, "Migration execution failed"
+                
+                if not migration.post_upgrade(self.connection):
+                    self.connection.execute(f"ROLLBACK TO SAVEPOINT {migration_savepoint}")
+                    return False, "Post-upgrade validation failed"
+                
+                self.connection.execute(f"RELEASE SAVEPOINT {migration_savepoint}")
+                
+                duration_ms = int((time.time() - start_time) * 1000)
+                
+                if not self.version_table.record_migration_complete(version, duration_ms):
+                    return False, "Failed to record migration completion"
+                
+                log_migration_step(
+                    f"Migration {version} applied successfully",
+                    "INFO",
+                    {'version': version, 'duration_ms': duration_ms}
+                )
+                
+                return True, f"Migration {version} applied successfully"
+                
+            except Exception as e:
+                self.connection.execute(f"ROLLBACK TO SAVEPOINT {batch_savepoint}")
+                self.version_table.record_migration_failed(version, str(e), int((time.time() - start_time) * 1000))
+                return False, f"Migration execution error: {e}"
+            
+        except Exception as e:
+            return False, f"Migration setup error: {e}"
+    
+    def _validate_post_migration(self) -> None:
+        """Validate database after migration."""
+        try:
+            log_migration_step("Starting post-migration validation", "INFO")
+            
+            is_valid, message = validate_database_integrity(self.connection)
+            if not is_valid:
+                raise Exception(f"Database integrity check failed: {message}")
+            
+            log_migration_step("Post-migration validation completed successfully", "INFO")
+            
+        except Exception as e:
+            log_migration_step(f"Post-migration validation failed: {e}", "ERROR")
+            raise
+    
+    def rollback_to(self, target_version: str, steps: Optional[int] = None,
+                   dry_run: bool = False) -> Tuple[bool, str, MigrationProgress]:
+        """
+        Rollback to specific version.
+        
+        Args:
+            target_version: Target version to rollback to
+            steps: Number of steps to rollback (alternative to target_version)
+            dry_run: If True, only simulate rollback
+            
+        Returns:
+            Tuple of (success, message, progress)
+        """
+        progress = MigrationProgress()
+        
+        try:
+            if not self.connection and not self.connect():
+                progress.total_steps = 1
+                progress.update(1, "Database connection failed")
+                self._report_progress(progress)
+                return False, "Database connection failed", progress
+            
+            applied_migrations = self.version_table.get_applied_migrations()
+            available_migrations = self.get_available_migrations()
+            
+            if not applied_migrations:
+                progress.total_steps = 1
+                progress.update(1, "No migrations to rollback")
+                self._report_progress(progress)
+                return True, "No migrations to rollback", progress
+            
+            applied_versions = [m['version'] for m in applied_migrations]
+            
+            target_version_parsed = self._parse_version(target_version)
+            migration_map = {m['version']: m for m in available_migrations}
+            
+            migrations_to_rollback = []
+            
+            if steps:
+                migrations_to_rollback = applied_migrations[-steps:]
+            else:
+                for migration in reversed(applied_migrations):
+                    if self._parse_version(migration['version']) > target_version_parsed:
+                        migrations_to_rollback.append(migration)
+                    else:
+                        break
+            
+            if not migrations_to_rollback:
+                progress.total_steps = 1
+                progress.update(1, "No migrations to rollback")
+                self._report_progress(progress)
+                return True, "No migrations to rollback", progress
+            
+            progress.total_steps = len(migrations_to_rollback) + 3
+            
+            progress.update(1, "Starting rollback process")
+            self._report_progress(progress)
+            
+            if dry_run:
+                return self._execute_rollback_dry_run(migrations_to_rollback, migration_map, progress)
+            
+            return self._execute_rollback_atomic(migrations_to_rollback, migration_map, progress)
+            
+        except Exception as e:
+            progress.add_error(f"Rollback failed: {e}")
+            progress.update(progress.total_steps, f"Failed: {e}")
+            self._report_progress(progress)
+            return False, f"Rollback failed: {e}", progress
+    
+    def _execute_rollback_dry_run(self, migrations_to_rollback: List[Dict[str, Any]],
+                                 migration_map: Dict[str, Dict[str, Any]],
+                                 progress: MigrationProgress) -> Tuple[bool, str, MigrationProgress]:
+        """Execute dry run simulation for rollback."""
+        try:
+            for i, migration in enumerate(migrations_to_rollback, 2):
+                version = migration['version']
+                migration_info = migration_map.get(version, {})
+                has_down_method = migration_info.get('has_down_method', False)
+                
+                if has_down_method:
+                    progress.update(i, f"Would rollback: {version} - {migration_info.get('description', '')}")
+                else:
+                    progress.update(i, f"Would mark as failed: {version} (no down method)")
+                
+                self._report_progress(progress)
+                time.sleep(0.1)
+            
+            progress.update(progress.total_steps, "Rollback dry run completed")
+            self._report_progress(progress)
+            
+            message = f"Dry run: Would rollback {len(migrations_to_rollback)} migrations"
+            for migration in migrations_to_rollback:
+                version = migration['version']
+                migration_info = migration_map.get(version, {})
+                has_down_method = migration_info.get('has_down_method', False)
+                
+                if has_down_method:
+                    message += f"\n  - {version}: {migration_info.get('description', '')} (rollback)"
+                else:
+                    message += f"\n  - {version}: {migration_info.get('description', '')} (mark as failed)"
+            
+            log_migration_step("Rollback dry run completed", "INFO", {'rollback_count': len(migrations_to_rollback)})
+            return True, message, progress
+            
+        except Exception as e:
+            progress.add_error(f"Rollback dry run failed: {e}")
+            progress.update(progress.total_steps, f"Rollback dry run failed: {e}")
+            self._report_progress(progress)
+            return False, f"Rollback dry run failed: {e}", progress
+    
+    def _execute_rollback_atomic(self, migrations_to_rollback: List[Dict[str, Any]],
+                                migration_map: Dict[str, Dict[str, Any]],
+                                progress: MigrationProgress) -> Tuple[bool, str, MigrationProgress]:
+        """Execute rollback with atomic guarantee using savepoints."""
+        backup_path = None
+        
+        try:
+            with self.connection_lock:
+                if not self.connection:
+                    self.connect()
+                
+                # Create a savepoint for the entire rollback batch
+                savepoint_name = f"rollback_batch_{int(time.time())}"
+                self.connection.execute(f"SAVEPOINT {savepoint_name}")
+                
+                progress.update(2, "Creating backup")
+                self._report_progress(progress)
+                
+                if self.config.create_backup:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_filename = f"rollback_backup_{timestamp}.db"
+                    backup_path = Path(self.config.backup_location) / backup_filename
+                    
+                    if not backup_database(self.config.database_path, str(backup_path.parent), backup_filename):
+                        progress.add_warning("Backup creation failed, proceeding without backup")
+                        log_migration_step("Backup creation failed", "WARNING")
+                
+                progress.update(3, "Preparing rollback environment")
+                self._report_progress(progress)
+                
+                for i, migration in enumerate(migrations_to_rollback, 4):
+                    version = migration['version']
+                    migration_info = migration_map.get(version, {})
+                    
+                    progress.update(i, f"Rolling back: {version} - {migration_info.get('description', '')}")
+                    self._report_progress(progress)
+                    
+                    success, message = self._apply_single_rollback_with_savepoint(version, migration_info, savepoint_name)
+                    if not success:
+                        progress.add_error(f"Rollback {version} failed: {message}")
+                        
+                        log_migration_step(f"Rollback {version} failed, rolling back batch", "ERROR")
+                        self.connection.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
+                        
+                        progress.update(progress.total_steps, f"Rollback failed at version {version}")
+                        self._report_progress(progress)
+                        
+                        return False, f"Rollback failed at version {version}: {message}", progress
+                
+                progress.update(progress.total_steps - 1, "Validating rollback results")
+                self._report_progress(progress)
+                
+                if self.config.validation_level.value != 'none':
+                    self._validate_post_migration()
+                
+                # All rollbacks succeeded, release the savepoint
+                self.connection.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+                self.connection.commit()
+                
+                progress.update(progress.total_steps, "Rollback completed successfully")
+                self._report_progress(progress)
+                
+                elapsed_time = format_duration(progress.get_elapsed_time())
+                message = f"Successfully rolled back {len(migrations_to_rollback)} migrations in {elapsed_time}"
+                
+                log_migration_step(
+                    "Rollback completed successfully",
+                    "INFO",
+                    {
+                        'rollback_count': len(migrations_to_rollback),
+                        'elapsed_time': elapsed_time,
+                        'backup_path': str(backup_path) if backup_path else None
+                    }
+                )
+                
+                return True, message, progress
+                
+        except Exception as e:
+            with self.connection_lock:
+                if self.connection:
+                    try:
+                        # Rollback to the savepoint if it exists
+                        self.connection.execute(f"ROLLBACK TO SAVEPOINT rollback_batch")
+                        self.connection.execute(f"RELEASE SAVEPOINT rollback_batch")
+                    except:
+                        # If savepoint doesn't exist, do a full rollback
+                        self.connection.rollback()
+            
+            progress.add_error(f"Atomic rollback failed: {e}")
+            progress.update(progress.total_steps, f"Rollback failed: {e}")
+            self._report_progress(progress)
+            
+            return False, f"Rollback failed: {e}", progress
+    
+    def _apply_single_rollback_with_savepoint(self, version: str, migration_info: Dict[str, Any], 
+                                            batch_savepoint: str) -> Tuple[bool, str]:
+        """Apply a single rollback with nested savepoint."""
+        try:
+            file_path = migration_info.get('file_path')
+            has_down_method = migration_info.get('has_down_method', False)
+            
+            if not has_down_method or not file_path:
+                log_migration_step(
+                    f"Migration {version} has no down method, marking as failed",
+                    "WARNING"
+                )
+                self.version_table.mark_migration_as_failed(version, "Rolled back - no down method available")
+                return True, f"Migration {version} marked as failed"
+            
+            migration_class = load_migration_class(file_path)
+            if not migration_class:
+                return False, f"Failed to load migration class for version {version}"
+            
+            migration = migration_class()
+            
+            if not hasattr(migration, 'down'):
+                return False, f"Migration {version} has no down method"
+            
+            start_time = time.time()
+            
+            try:
+                # Create a nested savepoint for this specific rollback
+                rollback_savepoint = f"rollback_{version}_{int(time.time())}"
+                self.connection.execute(f"SAVEPOINT {rollback_savepoint}")
+                
+                if hasattr(migration, 'pre_downgrade'):
+                    if not migration.pre_downgrade(self.connection):
+                        self.connection.execute(f"ROLLBACK TO SAVEPOINT {rollback_savepoint}")
+                        return False, "Pre-downgrade checks failed"
+                
+                if not migration.down(self.connection):
+                    self.connection.execute(f"ROLLBACK TO SAVEPOINT {rollback_savepoint}")
+                    return False, "Rollback execution failed"
+                
+                if hasattr(migration, 'post_downgrade'):
+                    if not migration.post_downgrade(self.connection):
+                        self.connection.execute(f"ROLLBACK TO SAVEPOINT {rollback_savepoint}")
+                        return False, "Post-downgrade validation failed"
+                
+                self.connection.execute(f"RELEASE SAVEPOINT {rollback_savepoint}")
+                
+                duration_ms = int((time.time() - start_time) * 1000)
+                
+                if not self.version_table.mark_migration_as_failed(version, "Rolled back successfully", duration_ms):
+                    return False, "Failed to update migration status"
+                
+                log_migration_step(
+                    f"Migration {version} rolled back successfully",
+                    "INFO",
+                    {'version': version, 'duration_ms': duration_ms}
+                )
+                
+                return True, f"Migration {version} rolled back successfully"
+                
+            except Exception as e:
+                self.connection.execute(f"ROLLBACK TO SAVEPOINT {batch_savepoint}")
+                return False, f"Rollback execution error: {e}"
+            
+        except Exception as e:
+            return False, f"Rollback setup error: {e}"
+    
+    def _extract_version_from_file(self, file_path: str) -> Optional[str]:
+        """Extract version from migration file name."""
+        try:
+            file_name = Path(file_path).name
+            if file_name.startswith("v") and "__" in file_name:
+                version_part = file_name.split("__")[0]
+                return version_part[1:]
+            return None
+        except Exception:
+            return None
+    
+    def _parse_version(self, version_str: str) -> tuple:
+        """Parse version string into tuple."""
+        parts = version_str.split("_")
+        
+        if len(parts) >= 3:
+            return (int(parts[0]), int(parts[1]), int(parts[2]))
+        elif len(parts) == 2:
+            return (int(parts[0]), int(parts[1]), 0)
+        else:
+            return (int(parts[0]), 0, 0)
+    
+    def __enter__(self):
+        self.connect()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
