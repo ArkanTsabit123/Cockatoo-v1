@@ -10,7 +10,7 @@ import sys
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING, Dict
 
 # Fix import path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
