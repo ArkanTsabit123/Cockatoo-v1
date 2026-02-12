@@ -16,12 +16,15 @@ import time
 import csv
 import io
 import importlib
+import importlib.util
 import inspect
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List, Union, Callable, Type
 from contextlib import contextmanager
+from typing import Dict, List
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -352,7 +355,6 @@ def get_indexes(connection: sqlite3.Connection, table_name: str) -> List[Dict[st
     try:
         cursor = connection.cursor()
         
-        # Fixed SQL query - removed invalid columns 'm.unique' and 'm.partial'
         cursor.execute(
             """
             SELECT 
@@ -375,7 +377,6 @@ def get_indexes(connection: sqlite3.Connection, table_name: str) -> List[Dict[st
         for idx in indexes_raw:
             idx_name = idx[0]
             if idx_name not in indexes:
-                # Extract is_unique and is_partial from the create statement
                 create_stmt = idx[3] if len(idx) > 3 else ""
                 is_unique = "UNIQUE" in create_stmt.upper() if create_stmt else False
                 is_partial = "WHERE" in create_stmt.upper() if create_stmt else False
@@ -1027,48 +1028,97 @@ def log_data_stats(connection: sqlite3.Connection, table_filter: Optional[List[s
 
 
 # ==============================
-# MIGRATION CLASS UTILITIES
+# MIGRATION CLASS UTILITIES - FIXED VERSION
 # ==============================
 
-def load_migration_class(module_path: str, class_name: str) -> Optional[Type]:
+def load_migration_class(file_path: str, class_name: str = "Migration") -> Optional[Type]:
     """
-    Dynamically load a migration class from a module.
+    Dynamically load a migration class from a file path.
     
     Args:
-        module_path: Full module path (e.g., 'src.database.migrations.v001_initial')
-        class_name: Name of the class to load
+        file_path: Path to the migration file
+        class_name: Name of the class to load (default: "Migration")
         
     Returns:
         Migration class if successful, None otherwise
     """
+    import importlib.util
+    import sys
+    from pathlib import Path
+    import inspect
+    
     try:
-        logger.debug(f"Attempting to load migration class: {module_path}.{class_name}")
+        logger.debug(f"Attempting to load migration class from: {file_path}")
         
-        module = importlib.import_module(module_path)
+        file_path_obj = Path(file_path)
+        if not file_path_obj.exists():
+            logger.error(f"Migration file not found: {file_path}")
+            return None
+        
+        module_name = file_path_obj.stem
+        
+        parent_dir = str(file_path_obj.parent)
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+            logger.debug(f"Added {parent_dir} to sys.path")
+        
+        try:
+            module = importlib.import_module(module_name)
+            logger.debug(f"Successfully imported module: {module_name}")
+        except ImportError:
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            if not spec or not spec.loader:
+                logger.error(f"Failed to create module spec for {file_path}")
+                return None
+            
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
+            logger.debug(f"Successfully loaded module from file: {module_name}")
+        
         migration_class = getattr(module, class_name, None)
         
         if migration_class is None:
-            logger.error(f"Class '{class_name}' not found in module '{module_path}'")
+            try:
+                from .base_migration import Migration
+                
+                for name, obj in inspect.getmembers(module, inspect.isclass):
+                    if issubclass(obj, Migration) and obj != Migration:
+                        migration_class = obj
+                        logger.debug(f"Found migration class: {name}")
+                        break
+            except ImportError:
+                try:
+                    from src.database.migrations.base_migration import Migration
+                    
+                    for name, obj in inspect.getmembers(module, inspect.isclass):
+                        if issubclass(obj, Migration) and obj != Migration:
+                            migration_class = obj
+                            logger.debug(f"Found migration class: {name}")
+                            break
+                except ImportError as e:
+                    logger.debug(f"Could not import base Migration class: {e}")
+        
+        if migration_class is None:
+            logger.error(f"No migration class found in {file_path}")
             return None
         
-        if not inspect.isclass(migration_class):
-            logger.error(f"'{class_name}' is not a class in module '{module_path}'")
-            return None
+        required_methods = ['upgrade', 'downgrade']
+        missing_methods = []
         
-        required_methods = ['up', 'down']
         for method in required_methods:
             if not hasattr(migration_class, method) or not callable(getattr(migration_class, method)):
-                logger.error(f"Migration class '{class_name}' missing required method '{method}'")
-                return None
+                missing_methods.append(method)
         
-        logger.info(f"Successfully loaded migration class: {module_path}.{class_name}")
+        if missing_methods:
+            logger.error(f"Migration class missing required methods: {missing_methods}")
+            return None
+        
+        logger.info(f"Successfully loaded migration class from {file_path_obj.name}")
         return migration_class
         
-    except ImportError as e:
-        logger.error(f"Failed to import module '{module_path}': {e}")
-        return None
     except Exception as e:
-        logger.error(f"Failed to load migration class '{class_name}' from '{module_path}': {e}")
+        logger.error(f"Failed to load migration class from {file_path}: {e}")
         return None
 
 
@@ -1099,30 +1149,19 @@ def discover_migration_classes(migrations_dir: str, base_module: str) -> List[Tu
         if py_file.name.startswith("__"):
             continue
         
-        module_name = py_file.stem
-        full_module_path = f"{base_module}.{module_name}"
-        
         try:
-            logger.debug(f"Importing migration module: {full_module_path}")
-            module = importlib.import_module(full_module_path)
-            
-            for name, obj in inspect.getmembers(module, inspect.isclass):
-                if name.startswith("Migration") and hasattr(obj, 'up') and hasattr(obj, 'down'):
-                    migrations.append((full_module_path, name, obj))
-                    logger.info(f"Discovered migration: {full_module_path}.{name}")
-                    
-        except ImportError as e:
-            logger.warning(f"Failed to import migration module {full_module_path}: {e}")
+            migration_class = load_migration_class(str(py_file), "Migration")
+            if migration_class:
+                module_name = py_file.stem
+                full_module_path = f"{base_module}.{module_name}"
+                class_name = migration_class.__name__
+                migrations.append((full_module_path, class_name, migration_class))
+                logger.info(f"Discovered migration: {full_module_path}.{class_name}")
         except Exception as e:
             logger.warning(f"Error processing migration file {py_file}: {e}")
     
     migrations.sort(key=lambda x: x[0])
     logger.info(f"Total migration classes discovered: {len(migrations)}")
-    
-    if migrations:
-        logger.info("Migration versions discovered:")
-        for module_path, class_name, _ in migrations:
-            logger.info(f"  - {module_path.split('.')[-1]}: {class_name}")
     
     return migrations
 
@@ -1165,17 +1204,17 @@ def validate_migration_class(migration_class: Type) -> Tuple[bool, List[str]]:
     """
     errors = []
     
-    if not hasattr(migration_class, 'up'):
-        errors.append("Missing 'up' method")
+    if not hasattr(migration_class, 'upgrade'):
+        errors.append("Missing 'upgrade' method")
     
-    if not hasattr(migration_class, 'down'):
-        errors.append("Missing 'down' method")
+    if not hasattr(migration_class, 'downgrade'):
+        errors.append("Missing 'downgrade' method")
     
-    if not callable(getattr(migration_class, 'up', None)):
-        errors.append("'up' method is not callable")
+    if not callable(getattr(migration_class, 'upgrade', None)):
+        errors.append("'upgrade' method is not callable")
     
-    if not callable(getattr(migration_class, 'down', None)):
-        errors.append("'down' method is not callable")
+    if not callable(getattr(migration_class, 'downgrade', None)):
+        errors.append("'downgrade' method is not callable")
     
     if not hasattr(migration_class, '__name__'):
         errors.append("Migration class has no name")
@@ -1348,3 +1387,42 @@ def estimate_migration_complexity(sql_statements: List[str]) -> Dict[str, Any]:
     logger.info(f"Migration complexity analysis: {analysis['total_statements']} statements, "
                f"risk level: {analysis['estimated_risk']}")
     return analysis
+
+
+def topological_sort(graph: Dict[str, List[str]]) -> List[str]:
+    """
+    Perform topological sort on dependency graph.
+    
+    Args:
+        graph: Dictionary mapping node to list of dependencies
+        
+    Returns:
+        List of nodes in topological order
+        
+    Raises:
+        ValueError: If graph contains cycles
+    """
+    from collections import deque
+    
+    in_degree = {node: 0 for node in graph}
+    for node, deps in graph.items():
+        for dep in deps:
+            if dep in in_degree:
+                in_degree[dep] = in_degree.get(dep, 0) + 1
+    
+    queue = deque([node for node in graph if in_degree[node] == 0])
+    result = []
+    
+    while queue:
+        node = queue.popleft()
+        result.append(node)
+        
+        for dep in graph.get(node, []):
+            in_degree[dep] -= 1
+            if in_degree[dep] == 0:
+                queue.append(dep)
+    
+    if len(result) != len(graph):
+        raise ValueError("Circular dependency detected in migration graph")
+    
+    return result
