@@ -242,3 +242,24 @@ alembic.ini
 alembic/
 validation_reports/
 src/database/migrations/
+
+
+# Application logs
+data/logs/
+
+# ============================================
+# DEBUG AND TEMPORARY FILES
+# ============================================
+
+# Debug log files
+initializer_debug.log
+initializer_debug_report.txt
+migration_debug.log
+migration_debug_results.json
+migration_assessment_report.txt
+
+# Log directories
+logs/
+
+# Document processing directories
+...
