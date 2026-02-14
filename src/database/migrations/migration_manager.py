@@ -13,6 +13,7 @@ import time
 import json
 import traceback
 import threading
+import random
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Callable, Union
@@ -118,7 +119,7 @@ class MigrationManager:
         self.connection: Optional[sqlite3.Connection] = None
         self.version_table: Optional[VersionTable] = None
         self.progress_callback: Optional[Callable[[MigrationProgress], None]] = None
-        self.connection_lock = threading.Lock()
+        self.connection_lock = threading.RLock()
         self.progress_lock = threading.Lock()
         
         log_level = getattr(logging, self.config.log_level.value.upper())
@@ -165,6 +166,9 @@ class MigrationManager:
         """
         with self.connection_lock:
             try:
+                if self.connection:
+                    return True
+                    
                 log_migration_step(
                     "Establishing database connection",
                     "INFO",
@@ -195,6 +199,8 @@ class MigrationManager:
                     "ERROR",
                     {'database_path': self.config.database_path, 'error': str(e)}
                 )
+                self.connection = None
+                self.version_table = None
                 return False
     
     def disconnect(self) -> None:
@@ -210,9 +216,20 @@ class MigrationManager:
                     self.connection = None
                     self.version_table = None
     
-    def _extract_version_from_migration_record(self, record: Union[Dict, Tuple, sqlite3.Row, Any, None]) -> Optional[str]:
+    def _ensure_connection(self) -> bool:
         """
-        Safely extract version from migration record regardless of format.
+        Ensure database connection is established.
+        
+        Returns:
+            True if connection is available, False otherwise
+        """
+        if not self.connection:
+            return self.connect()
+        return True
+    
+    def _extract_version_from_migration_record(self, record: Optional[Union[Dict, sqlite3.Row]]) -> Optional[str]:
+        """
+        Safely extract version from migration record.
         
         Args:
             record: Migration record from version table
@@ -232,19 +249,11 @@ class MigrationManager:
             except (KeyError, IndexError):
                 pass
         
-        if isinstance(record, (tuple, list)):
-            if len(record) > 0:
-                return str(record[0])
-        
-        if hasattr(record, 'version'):
-            return record.version
-        
         return None
     
-    def _convert_migration_record_to_dict(self, record: Union[Dict, Tuple, sqlite3.Row, Any, None]) -> Dict[str, Any]:
+    def _convert_migration_record_to_dict(self, record: Optional[Union[Dict, sqlite3.Row]]) -> Dict[str, Any]:
         """
         Convert migration record to dictionary format.
-        Handles empty records gracefully.
         
         Args:
             record: Migration record from version table
@@ -256,36 +265,13 @@ class MigrationManager:
             return {}
         
         if isinstance(record, dict):
-            return record
+            return record.copy()
         
         if isinstance(record, sqlite3.Row):
             try:
-                keys = record.keys()
-                return {key: record[key] for key in keys}
+                return {key: record[key] for key in record.keys()}
             except Exception:
                 return {}
-        
-        if isinstance(record, (tuple, list)):
-            if len(record) == 0:
-                return {}
-            
-            result = {}
-            if len(record) >= 1:
-                result['version'] = str(record[0])
-            if len(record) >= 2:
-                result['description'] = str(record[1]) if record[1] is not None else ''
-            if len(record) >= 3:
-                result['applied_at'] = record[2]
-            if len(record) >= 4:
-                result['execution_time_ms'] = record[3]
-            if len(record) >= 5:
-                result['checksum'] = record[4]
-            if len(record) >= 6:
-                result['status'] = record[5]
-            return result
-        
-        if hasattr(record, 'version'):
-            return {'version': record.version}
         
         return {}
     
@@ -296,7 +282,7 @@ class MigrationManager:
         Returns:
             Current version string or None if no migrations applied
         """
-        if not self.connection and not self.connect():
+        if not self._ensure_connection():
             return None
         
         try:
@@ -346,13 +332,28 @@ class MigrationManager:
     
     def get_available_migrations(self) -> List[Dict[str, Any]]:
         """
-        Get list of all available migrations with details.
+        Get list of available migrations from filesystem.
         
         Returns:
-            List of migration information dictionaries
+            List of migration dictionaries
         """
         try:
-            migration_files = self.config.get_migration_files()
+            migration_dir = Path(self.config.migrations_dir)
+            
+            version_dir = migration_dir / "version"
+            if version_dir.exists():
+                search_dir = version_dir
+            else:
+                search_dir = migration_dir
+                logger.warning(f"Version directory not found, using {migration_dir} directly")
+            
+            migration_files = []
+            for file_path in search_dir.glob("v*.py"):
+                if file_path.name == "__init__.py":
+                    continue
+                migration_files.append(str(file_path))
+            
+            migration_files.sort()
             migrations = []
             
             for file_path in migration_files:
@@ -368,11 +369,11 @@ class MigrationManager:
                         migrations.append({
                             'version': version,
                             'file_path': file_path,
-                            'description': getattr(migration, 'description', 'Unknown'),
-                            'dependencies': getattr(migration, 'dependencies', []),
-                            'is_breaking': getattr(migration, 'is_breaking', False),
-                            'has_down_method': hasattr(migration, 'down'),
-                            'estimated_duration': getattr(migration, 'estimate_duration', lambda: 30)()
+                            'description': migration.get_description(),
+                            'dependencies': migration.get_dependencies(),
+                            'is_breaking': migration.is_breaking_change(),
+                            'has_down_method': hasattr(migration, 'downgrade'),
+                            'estimated_duration': migration.estimate_duration()
                         })
                     else:
                         migrations.append({
@@ -390,6 +391,7 @@ class MigrationManager:
                     continue
             
             migrations.sort(key=lambda x: self._parse_version(x['version']))
+            logger.info(f"Found {len(migrations)} available migrations")
             return migrations
             
         except Exception as e:
@@ -399,7 +401,6 @@ class MigrationManager:
     def _get_applied_migrations_as_dicts(self) -> List[Dict[str, Any]]:
         """
         Get applied migrations and convert them to dictionary format.
-        Handles empty result set gracefully.
         
         Returns:
             List of applied migration dictionaries
@@ -439,6 +440,26 @@ class MigrationManager:
         
         return versions
     
+    def _refresh_applied_versions(self) -> List[str]:
+        """
+        Refresh the list of applied versions directly from database.
+        
+        Returns:
+            List of applied version strings
+        """
+        try:
+            if not self.connection:
+                return []
+            
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT version FROM schema_migrations WHERE status='applied'")
+            versions = [row[0] for row in cursor.fetchall()]
+            logger.debug(f"Refreshed applied versions from DB: {versions}")
+            return versions
+        except Exception as e:
+            logger.error(f"Failed to refresh applied versions: {e}")
+            return []
+    
     def check_needs_migration(self) -> Dict[str, Any]:
         """
         Check if migration is needed.
@@ -446,7 +467,7 @@ class MigrationManager:
         Returns:
             Dictionary with migration needs analysis
         """
-        if not self.connection and not self.connect():
+        if not self._ensure_connection():
             return {'needs_migration': False, 'error': 'Database connection failed'}
         
         try:
@@ -605,8 +626,14 @@ class MigrationManager:
             migrations: List of migration dictionaries
             
         Returns:
-            Topologically sorted list of migrations
+            Topologically sorted list of migrations (dependencies first)
         """
+        if not migrations:
+            return []
+        
+        from collections import deque
+        
+        # Build dependency graph
         graph = {}
         migration_map = {}
         
@@ -615,34 +642,84 @@ class MigrationManager:
             migration_map[version] = migration
             graph[version] = migration.get('dependencies', [])
         
-        try:
-            sorted_versions = topological_sort(graph)
-            return [migration_map[version] for version in sorted_versions if version in migration_map]
-        except ValueError as e:
-            logger.error(f"Failed to resolve migration order: {e}")
+        logger.debug(f"Dependency graph: {graph}")
+        
+        # Kahn's topological sort algorithm
+        in_degree = {v: 0 for v in graph}
+        for v, deps in graph.items():
+            for dep in deps:
+                if dep in in_degree:
+                    in_degree[dep] += 1
+        
+        # Queue nodes with no dependencies
+        queue = deque([v for v in graph if in_degree[v] == 0])
+        result = []
+        
+        while queue:
+            v = queue.popleft()
+            result.append(v)
+            
+            # Reduce in-degree of dependents
+            for node, deps in graph.items():
+                if v in deps:
+                    in_degree[node] -= 1
+                    if in_degree[node] == 0 and node not in result:
+                        queue.append(node)
+        
+        # Check if all nodes were processed
+        if len(result) != len(graph):
+            logger.error(f"Circular dependency detected. Processed: {result}, Total: {list(graph.keys())}")
+            migrations.sort(key=lambda x: self._parse_version(x['version']))
+            logger.warning(f"Using fallback sorting: {[m['version'] for m in migrations]}")
             return migrations
+        
+        logger.info(f"Resolved migration order: {result}")
+        return [migration_map[v] for v in result]
     
     def _get_pending_migrations(self, target_version: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get list of pending migrations up to target version."""
+        """
+        Get list of pending migrations up to target version with dependency validation.
+        
+        Args:
+            target_version: Target version to migrate to
+            
+        Returns:
+            List of pending migrations
+        """
         try:
             available_migrations = self.get_available_migrations()
             applied_versions = self._get_applied_versions()
             
-            pending = []
-            for migration in available_migrations:
-                if migration['version'] not in applied_versions:
-                    if target_version:
-                        if migration['version'] == target_version:
-                            pending.append(migration)
-                            break
-                        elif self._parse_version(migration['version']) > self._parse_version(target_version):
-                            continue
-                        else:
-                            pending.append(migration)
-                    else:
-                        pending.append(migration)
+            logger.debug(f"Applied versions: {applied_versions}")
             
-            return pending
+            pending = []
+            target_parsed = self._parse_version(target_version) if target_version else None
+            
+            for migration in available_migrations:
+                version = migration['version']
+                version_parsed = self._parse_version(version)
+                
+                if version in applied_versions:
+                    logger.debug(f"Skipping {version} - already applied")
+                    continue
+                    
+                if target_parsed and version_parsed > target_parsed:
+                    continue
+                
+                pending.append(migration)
+            
+            logger.debug(f"Pending before ordering: {[m['version'] for m in pending]}")
+            
+            ordered_pending = self._resolve_migration_order(pending)
+            
+            all_pending_versions = [m['version'] for m in ordered_pending]
+            for migration in ordered_pending:
+                for dep in migration.get('dependencies', []):
+                    if dep not in applied_versions and dep not in all_pending_versions:
+                        logger.error(f"Dependency {dep} for migration {migration['version']} not satisfied")
+                        return []
+            
+            return ordered_pending
             
         except Exception as e:
             logger.error(f"Failed to get pending migrations: {e}")
@@ -663,6 +740,12 @@ class MigrationManager:
         progress = MigrationProgress()
         
         try:
+            if not self._ensure_connection():
+                progress.total_steps = 1
+                progress.update(1, "Database connection failed")
+                self._report_progress(progress)
+                return False, "Database connection failed", progress
+            
             needs_check = self.check_needs_migration()
             if not needs_check.get('needs_migration', False):
                 progress.total_steps = 1
@@ -671,7 +754,6 @@ class MigrationManager:
                 return True, "Database is already up to date", progress
             
             pending_migrations = self._get_pending_migrations(target_version)
-            pending_migrations = self._resolve_migration_order(pending_migrations)
             
             if not pending_migrations:
                 progress.total_steps = 1
@@ -742,10 +824,11 @@ class MigrationManager:
         
         try:
             with self.connection_lock:
-                if not self.connection:
-                    self.connect()
+                if not self._ensure_connection():
+                    return False, "Database connection failed", progress
                 
-                savepoint_name = f"migration_batch_{int(time.time())}"
+                savepoint_name = f"migration_batch_{int(time.time())}_{random.randint(1000, 9999)}"
+                logger.debug(f"Creating savepoint: {savepoint_name}")
                 self.connection.execute(f"SAVEPOINT {savepoint_name}")
                 
                 progress.update(2, "Creating backup")
@@ -756,7 +839,8 @@ class MigrationManager:
                     backup_filename = f"migration_backup_{timestamp}.db"
                     backup_path = Path(self.config.backup_location) / backup_filename
                     
-                    if not backup_database(self.config.database_path, str(backup_path.parent), backup_filename):
+                    backup_dir = str(backup_path.parent)
+                    if not backup_database(self.config.database_path, backup_dir, backup_filename):
                         progress.add_warning("Backup creation failed, proceeding without backup")
                         log_migration_step("Backup creation failed", "WARNING")
                     else:
@@ -769,9 +853,50 @@ class MigrationManager:
                 progress.update(3, "Preparing migration environment")
                 self._report_progress(progress)
                 
+                applied_in_batch = set()
+                
                 for i, migration in enumerate(pending_migrations, 4):
                     version = migration['version']
                     description = migration.get('description', 'Unknown')
+                    
+                    # Refresh applied versions from database before each migration
+                    try:
+                        cursor = self.connection.cursor()
+                        cursor.execute("SELECT version FROM schema_migrations WHERE status='applied'")
+                        fresh_applied = [row[0] for row in cursor.fetchall()]
+                        applied_versions = set(fresh_applied)
+                        logger.debug(f"Fresh applied versions before {version}: {applied_versions}")
+                    except Exception as e:
+                        logger.warning(f"Failed to refresh applied versions: {e}")
+                        applied_versions = set(self._get_applied_versions())
+                    
+                    all_applied = applied_versions.union(applied_in_batch)
+                    logger.debug(f"All applied before {version}: {all_applied}")
+                    
+                    if version in all_applied:
+                        logger.info(f"Migration {version} already applied, skipping")
+                        progress.update(i, f"Skipping migration: {version} - {description} (already applied)")
+                        self._report_progress(progress)
+                        applied_in_batch.add(version)
+                        continue
+                    
+                    for dep in migration.get('dependencies', []):
+                        if dep not in all_applied:
+                            error_msg = f"Dependency {dep} not satisfied for migration {version}"
+                            logger.error(error_msg)
+                            progress.add_error(error_msg)
+                            
+                            try:
+                                logger.debug(f"Rolling back to savepoint: {savepoint_name}")
+                                self.connection.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
+                                self.connection.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+                            except Exception as sp_e:
+                                logger.error(f"Error during rollback: {sp_e}")
+                            
+                            progress.update(progress.total_steps, f"Migration failed at version {version}")
+                            self._report_progress(progress)
+                            
+                            return False, f"Migration failed at version {version}: {error_msg}", progress
                     
                     progress.update(i, f"Applying migration: {version} - {description}")
                     self._report_progress(progress)
@@ -780,13 +905,19 @@ class MigrationManager:
                     if not success:
                         progress.add_error(f"Migration {version} failed: {message}")
                         
-                        log_migration_step(f"Migration {version} failed, rolling back batch", "ERROR")
-                        self.connection.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
+                        try:
+                            logger.debug(f"Rolling back to savepoint: {savepoint_name}")
+                            self.connection.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
+                            self.connection.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+                        except Exception as sp_e:
+                            logger.error(f"Error during rollback: {sp_e}")
                         
                         progress.update(progress.total_steps, f"Migration failed at version {version}")
                         self._report_progress(progress)
                         
                         return False, f"Migration failed at version {version}: {message}", progress
+                    
+                    applied_in_batch.add(version)
                 
                 progress.update(progress.total_steps - 2, "Finalizing migration")
                 self._report_progress(progress)
@@ -797,7 +928,16 @@ class MigrationManager:
                 if self.config.validation_level.value != 'none':
                     self._validate_post_migration()
                 
-                self.connection.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+                # Safely release savepoint with error handling
+                try:
+                    logger.debug(f"Releasing savepoint: {savepoint_name}")
+                    self.connection.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+                except sqlite3.OperationalError as e:
+                    if "no such savepoint" in str(e):
+                        logger.debug(f"Savepoint {savepoint_name} already released")
+                    else:
+                        raise
+                
                 self.connection.commit()
                 
                 progress.update(progress.total_steps, "Migration completed successfully")
@@ -850,10 +990,25 @@ class MigrationManager:
             
             migration = migration_class()
             
-            applied_versions = self._get_applied_versions()
+            # Query applied versions directly from database for accurate dependency check
+            try:
+                cursor = self.connection.cursor()
+                cursor.execute("SELECT version FROM schema_migrations WHERE status='applied'")
+                applied_versions = {row[0] for row in cursor.fetchall()}
+                logger.debug(f"Applied versions from DB for dependency check: {applied_versions}")
+            except Exception as e:
+                logger.warning(f"Failed to query applied versions: {e}")
+                applied_versions = set(self._get_applied_versions())
+            
             for dep in migration_info.get('dependencies', []):
                 if dep not in applied_versions:
+                    logger.error(f"Dependency check failed: {dep} not in {applied_versions}")
                     return False, f"Dependency {dep} not satisfied"
+            
+            existing = self.version_table.get_migration_by_version(version)
+            if existing and existing.get('status') == 'applied':
+                logger.info(f"Migration {version} already applied, skipping")
+                return True, f"Migration {version} already applied"
             
             if not self.version_table.record_migration_start(
                 version, migration_info.get('description', ''),
@@ -864,21 +1019,25 @@ class MigrationManager:
             start_time = time.time()
             
             try:
-                migration_savepoint = f"migration_{version}_{int(time.time())}"
+                migration_savepoint = f"migration_{version}_{int(time.time())}_{random.randint(1000, 9999)}"
+                logger.debug(f"Creating migration savepoint: {migration_savepoint}")
                 self.connection.execute(f"SAVEPOINT {migration_savepoint}")
                 
                 if hasattr(migration, 'pre_upgrade') and callable(migration.pre_upgrade):
                     if not migration.pre_upgrade(self.connection):
                         self.connection.execute(f"ROLLBACK TO SAVEPOINT {migration_savepoint}")
+                        self.connection.execute(f"RELEASE SAVEPOINT {migration_savepoint}")
                         return False, "Pre-upgrade checks failed"
                 
                 if not migration.upgrade(self.connection):
                     self.connection.execute(f"ROLLBACK TO SAVEPOINT {migration_savepoint}")
+                    self.connection.execute(f"RELEASE SAVEPOINT {migration_savepoint}")
                     return False, "Migration execution failed"
                 
                 if hasattr(migration, 'post_upgrade') and callable(migration.post_upgrade):
                     if not migration.post_upgrade(self.connection):
                         self.connection.execute(f"ROLLBACK TO SAVEPOINT {migration_savepoint}")
+                        self.connection.execute(f"RELEASE SAVEPOINT {migration_savepoint}")
                         return False, "Post-upgrade validation failed"
                 
                 self.connection.execute(f"RELEASE SAVEPOINT {migration_savepoint}")
@@ -897,8 +1056,27 @@ class MigrationManager:
                 return True, f"Migration {version} applied successfully"
                 
             except Exception as e:
+                error_str = str(e).lower()
+                
+                if "already exists" in error_str and version == "1_0_0":
+                    logger.warning(f"Migration {version} tables already exist, marking as applied")
+                    
+                    try:
+                        self.connection.execute(f"RELEASE SAVEPOINT {migration_savepoint}")
+                    except:
+                        pass
+                    
+                    self.connection.commit()
+                    
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    if not self.version_table.record_migration_complete(version, duration_ms):
+                        logger.error(f"Failed to record migration {version} as complete")
+                    
+                    return True, f"Migration {version} already applied (tables exist)"
+                
                 try:
                     self.connection.execute(f"ROLLBACK TO SAVEPOINT {migration_savepoint}")
+                    self.connection.execute(f"RELEASE SAVEPOINT {migration_savepoint}")
                 except:
                     pass
                 
@@ -943,7 +1121,7 @@ class MigrationManager:
         progress = MigrationProgress()
         
         try:
-            if not self.connection and not self.connect():
+            if not self._ensure_connection():
                 progress.total_steps = 1
                 progress.update(1, "Database connection failed")
                 self._report_progress(progress)
@@ -966,6 +1144,8 @@ class MigrationManager:
             migrations_to_rollback = []
             
             if steps:
+                if steps > len(applied_migrations):
+                    steps = len(applied_migrations)
                 migrations_to_rollback = applied_migrations[-steps:]
             else:
                 for migration in reversed(applied_migrations):
@@ -1046,10 +1226,10 @@ class MigrationManager:
         
         try:
             with self.connection_lock:
-                if not self.connection:
-                    self.connect()
+                if not self._ensure_connection():
+                    return False, "Database connection failed", progress
                 
-                savepoint_name = f"rollback_batch_{int(time.time())}"
+                savepoint_name = f"rollback_batch_{int(time.time())}_{random.randint(1000, 9999)}"
                 self.connection.execute(f"SAVEPOINT {savepoint_name}")
                 
                 progress.update(2, "Creating backup")
@@ -1060,7 +1240,8 @@ class MigrationManager:
                     backup_filename = f"rollback_backup_{timestamp}.db"
                     backup_path = Path(self.config.backup_location) / backup_filename
                     
-                    if not backup_database(self.config.database_path, str(backup_path.parent), backup_filename):
+                    backup_dir = str(backup_path.parent)
+                    if not backup_database(self.config.database_path, backup_dir, backup_filename):
                         progress.add_warning("Backup creation failed, proceeding without backup")
                         log_migration_step("Backup creation failed", "WARNING")
                 
@@ -1080,6 +1261,7 @@ class MigrationManager:
                         
                         log_migration_step(f"Rollback {version} failed, rolling back batch", "ERROR")
                         self.connection.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
+                        self.connection.execute(f"RELEASE SAVEPOINT {savepoint_name}")
                         
                         progress.update(progress.total_steps, f"Rollback failed at version {version}")
                         self._report_progress(progress)
@@ -1154,27 +1336,30 @@ class MigrationManager:
             
             migration = migration_class()
             
-            if not hasattr(migration, 'down') or not callable(migration.down):
-                return False, f"Migration {version} has no down method"
+            if not hasattr(migration, 'downgrade') or not callable(migration.downgrade):
+                return False, f"Migration {version} has no downgrade method"
             
             start_time = time.time()
             
             try:
-                rollback_savepoint = f"rollback_{version}_{int(time.time())}"
+                rollback_savepoint = f"rollback_{version}_{int(time.time())}_{random.randint(1000, 9999)}"
                 self.connection.execute(f"SAVEPOINT {rollback_savepoint}")
                 
                 if hasattr(migration, 'pre_downgrade') and callable(migration.pre_downgrade):
                     if not migration.pre_downgrade(self.connection):
                         self.connection.execute(f"ROLLBACK TO SAVEPOINT {rollback_savepoint}")
+                        self.connection.execute(f"RELEASE SAVEPOINT {rollback_savepoint}")
                         return False, "Pre-downgrade checks failed"
                 
-                if not migration.down(self.connection):
+                if not migration.downgrade(self.connection):
                     self.connection.execute(f"ROLLBACK TO SAVEPOINT {rollback_savepoint}")
+                    self.connection.execute(f"RELEASE SAVEPOINT {rollback_savepoint}")
                     return False, "Rollback execution failed"
                 
                 if hasattr(migration, 'post_downgrade') and callable(migration.post_downgrade):
                     if not migration.post_downgrade(self.connection):
                         self.connection.execute(f"ROLLBACK TO SAVEPOINT {rollback_savepoint}")
+                        self.connection.execute(f"RELEASE SAVEPOINT {rollback_savepoint}")
                         return False, "Post-downgrade validation failed"
                 
                 self.connection.execute(f"RELEASE SAVEPOINT {rollback_savepoint}")
@@ -1197,6 +1382,7 @@ class MigrationManager:
             except Exception as e:
                 try:
                     self.connection.execute(f"ROLLBACK TO SAVEPOINT {rollback_savepoint}")
+                    self.connection.execute(f"RELEASE SAVEPOINT {rollback_savepoint}")
                 except:
                     pass
                 return False, f"Rollback execution error: {e}"

@@ -13,6 +13,9 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from enum import Enum
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ValidationLevel(Enum):
@@ -128,6 +131,10 @@ class MigrationConfig:
         self._ensure_directory(self.migrations_dir, "Migrations directory")
         self._ensure_directory(self.backup_location, "Backup directory")
         
+        # Ensure version subdirectory exists
+        version_dir = os.path.join(self.migrations_dir, "version")
+        self._ensure_directory(version_dir, "Version directory")
+        
         if self.log_file:
             log_dir = os.path.dirname(self.log_file)
             self._ensure_directory(log_dir, "Log directory")
@@ -163,7 +170,10 @@ class MigrationConfig:
     
     def get_migration_files(self) -> List[str]:
         """
-        Get sorted list of migration files.
+        Get sorted list of migration files from version subdirectory.
+        
+        Migration files should be located in the 'version' subdirectory
+        with naming pattern: v1_0_0__description.py
         
         Returns:
             List of migration file paths sorted by version
@@ -178,9 +188,16 @@ class MigrationConfig:
             )
         
         migration_dir = Path(self.migrations_dir)
+        version_dir = migration_dir / "version"
+        
+        if not version_dir.exists():
+            logger.warning(f"Version directory not found: {version_dir}, creating it")
+            version_dir.mkdir(parents=True, exist_ok=True)
+            return []
+        
         migration_files = []
         
-        for file_path in migration_dir.glob("v*.py"):
+        for file_path in version_dir.glob("v*.py"):
             if file_path.name == "__init__.py":
                 continue
             
@@ -188,14 +205,16 @@ class MigrationConfig:
                 migration_files.append(str(file_path))
         
         migration_files.sort(key=lambda x: self._extract_version(x))
+        logger.info(f"Found {len(migration_files)} migration files in {version_dir}")
         return migration_files
     
     def _is_valid_migration_file(self, filename: str) -> bool:
         """
         Check if a filename matches migration naming convention.
         
-        Expected format: v1_0_0__description.py
-        Alternative format: v1.0.0__description.py (will be standardized to underscores)
+        Supports both:
+        - v1_0_0__description.py (with double underscore)
+        - v1_0_0_initial.py (with single underscore for description)
         
         Args:
             filename: Name of the file to check
@@ -207,18 +226,15 @@ class MigrationConfig:
             return False
         
         name_without_ext = filename[:-3]
-        parts = name_without_ext.split("__")
         
-        if len(parts) != 2:
-            return False
+        # Check if it has version part (vX_X_X)
+        version_part = name_without_ext.split("__")[0] if "__" in name_without_ext else name_without_ext
         
-        version_part = parts[0]
-        
-        version_str = version_part[1:]
+        version_str = version_part[1:]  # Remove 'v' prefix
         version_str = version_str.replace('.', '_')
-        
         version_parts = version_str.split('_')
         
+        # Must have at least major.minor.patch
         if len(version_parts) < 3:
             return False
         
@@ -234,7 +250,10 @@ class MigrationConfig:
         """
         Extract version number from migration file name.
         
-        Handles both v1_0_0 and v1.0.0 formats.
+        Handles both:
+        - v1_0_0__description.py (double underscore)
+        - v1_0_0_initial.py (single underscore)
+        - v1.0.0__description.py (dots)
         
         Args:
             file_path: Path to migration file
@@ -243,9 +262,17 @@ class MigrationConfig:
             Tuple of (major, minor, patch) version numbers
         """
         file_name = Path(file_path).stem
-        version_part = file_name.split("__")[0]
-        version_str = version_part[1:]
         
+        # Split by double underscore first, fallback to whole string
+        if "__" in file_name:
+            version_part = file_name.split("__")[0]
+        else:
+            # Take everything after 'v' and before the first underscore after version
+            # This handles v1_0_0_initial.py -> take first 3 parts after splitting
+            parts = file_name.split('_')
+            version_part = '_'.join(parts[:4]) if len(parts) >= 4 else file_name
+        
+        version_str = version_part[1:]  # Remove 'v'
         version_str = version_str.replace('.', '_')
         version_parts = version_str.split('_')
         

@@ -421,17 +421,13 @@ class Migration(ABC):
     
     def _validate_version_format(self) -> None:
         """
-        Validate that the version string follows semantic versioning.
-        
-        Supports versions with optional pre-release and build metadata suffixes:
-        - Standard: 1.0.0
-        - Pre-release: 1.0.0-alpha, 1.0.0-beta.1, 1.0.0-rc.2
-        - Build metadata: 1.0.0+build.123, 1.0.0-alpha.1+build.456
-        
-        Raises:
-            MigrationValidationError: If version format is invalid
+        Validate that the version string follows semantic versioning format.
+        Now accepts both dot (1.0.0) and underscore (1_0_0) formats.
         """
         version = self.version
+        
+        # Ubah underscore menjadi titik untuk validasi
+        version_for_validation = version.replace('_', '.')
         
         # Semantic versioning pattern with optional pre-release and build metadata
         semver_pattern = r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)' \
@@ -439,7 +435,7 @@ class Migration(ABC):
                         r'(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?' \
                         r'(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'
         
-        if not re.match(semver_pattern, version):
+        if not re.match(semver_pattern, version_for_validation):
             raise MigrationValidationError(
                 f"Version '{version}' does not follow semantic versioning format. "
                 f"Expected format: major.minor.patch[-pre-release][+build-metadata]. "

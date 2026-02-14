@@ -1,0 +1,37 @@
+# Cockatoo Data Directory - DO NOT COMMIT
+# This directory contains user data and should not be version controlled
+
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Uploaded documents
+documents/uploads/*
+!documents/uploads/.gitkeep
+documents/processed/*
+!documents/processed/.gitkeep
+
+# AI Models (can be large)
+models/*
+!models/.gitkeep
+!models/embeddings/.gitkeep
+!models/llms/.gitkeep
+
+# Logs
+logs/*.log
+!logs/.gitkeep
+
+# Backups
+backups/*.backup
+!backups/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Environment files
+.env
+*.env.local

@@ -47,6 +47,7 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+.hypothesis/
 
 # Development environment configurations
 .vscode/
@@ -66,7 +67,6 @@ coverage.xml
 *complete*structure*.py
 *check_progress*.py
 *database_debug_report*.json
-
 
 # Development file patterns
 *tracker*.py
@@ -96,7 +96,6 @@ smart_validation_report.json
 *_report_*.txt
 *debugger*.py
 
-
 # User-specific configuration overrides
 data/config/*.local.yaml
 data/config/*.local.json
@@ -108,7 +107,6 @@ data/config/local_*.json
 data/database/
 !data/config/
 !data/database/migrations/
-
 
 # Application logs
 data/logs/
@@ -237,15 +235,74 @@ poetry.lock
 !install_cockatoo_v1.py
 !check_server.py
 
-# Database migrations
+# ============================================
+# DATABASE MIGRATIONS - SPECIAL HANDLING
+# ============================================
+
+# Alembic configuration
 alembic.ini
 alembic/
 validation_reports/
-src/database/migrations/
 
+# ============================================
+# MIGRATIONS VERSION FILES - WAJIB DI-TRACK!
+# ============================================
+# Version folder - track semua file Python migrasi
+src/database/migrations/version/
+!src/database/migrations/version/
+!src/database/migrations/version/*.py
+!src/database/migrations/version/__init__.py
+!src/database/migrations/version/.gitkeep
 
-# Application logs
-data/logs/
+# TAPI ignore pycache di dalam version
+src/database/migrations/version/__pycache__/
+src/database/migrations/version/*.pyc
+
+# ============================================
+# MIGRATIONS CORE FILES - WAJIB DI-TRACK!
+# ============================================
+src/database/migrations/__init__.py
+!src/database/migrations/__init__.py
+src/database/migrations/base_migration.py
+!src/database/migrations/base_migration.py
+src/database/migrations/migration_config.py
+!src/database/migrations/migration_config.py
+src/database/migrations/migration_manager.py
+!src/database/migrations/migration_manager.py
+src/database/migrations/migration_utils.py
+!src/database/migrations/migration_utils.py
+
+# ============================================
+# MIGRATIONS DEBUG/TEMP FILES - IGNORE!
+# ============================================
+# Debugger files
+src/database/migrations/*debugger*.py
+src/database/migrations/*_debugger.py
+src/database/migrations/*_tracker.py
+src/database/migrations/*.json
+src/database/migrations/check_*.py
+src/database/migrations/test_*.py
+src/database/migrations/run_*.py
+src/database/migrations/temp_*.py
+src/database/migrations/testing_*.py
+src/database/migrations/database_initializer.py
+!src/database/migrations/database_initializer.py
+
+# Specific debug files
+src/database/migrations/check_migrations.py.py
+src/database/migrations/database_initializer_debugger.py
+src/database/migrations/migration_config_debugger.py
+src/database/migrations/migration_manager_debugger.py
+src/database/migrations/migration_utils_debugger.py
+src/database/migrations/version_table_debugger.py
+src/database/migrations/testing_migration.py
+src/database/migrations/run_migration.py
+src/database/migrations/migration_tracker.py
+src/database/migrations/migration_registry.json
+
+# Python cache di migrations
+src/database/migrations/__pycache__/
+src/database/migrations/*.pyc
 
 # ============================================
 # DEBUG AND TEMPORARY FILES
@@ -261,5 +318,30 @@ migration_assessment_report.txt
 # Log directories
 logs/
 
-# Document processing directories
-...
+# ============================================
+# LOCAL CONFIGURATION AND BACKUPS
+# ============================================
+
+# Environment files
+.cockatoo_env
+.env
+.env.*
+
+# Local configuration directories
+config/
+!config/.gitkeep
+
+# Local backups
+data/backups/
+!data/backups/.gitkeep
+
+
+# ============================================
+# DATABASE BACKUPS - IGNORE SEMUA
+# ============================================
+backups/
+backups/migrations/
+*.backup
+*.db-backup
+data/backups/
+!data/backups/.gitkeep
