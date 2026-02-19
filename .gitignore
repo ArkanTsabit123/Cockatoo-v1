@@ -245,21 +245,21 @@ alembic/
 validation_reports/
 
 # ============================================
-# MIGRATIONS VERSION FILES - WAJIB DI-TRACK!
+# MIGRATIONS VERSION FILES - MUST TRACK
 # ============================================
-# Version folder - track semua file Python migrasi
+# Version folder - track all Python migration files
 src/database/migrations/version/
 !src/database/migrations/version/
 !src/database/migrations/version/*.py
 !src/database/migrations/version/__init__.py
 !src/database/migrations/version/.gitkeep
 
-# TAPI ignore pycache di dalam version
+# Ignore pycache in version folder
 src/database/migrations/version/__pycache__/
 src/database/migrations/version/*.pyc
 
 # ============================================
-# MIGRATIONS CORE FILES - WAJIB DI-TRACK!
+# MIGRATIONS CORE FILES - MUST TRACK
 # ============================================
 src/database/migrations/__init__.py
 !src/database/migrations/__init__.py
@@ -273,7 +273,7 @@ src/database/migrations/migration_utils.py
 !src/database/migrations/migration_utils.py
 
 # ============================================
-# MIGRATIONS DEBUG/TEMP FILES - IGNORE!
+# MIGRATIONS DEBUG/TEMP FILES - IGNORE
 # ============================================
 # Debugger files
 src/database/migrations/*debugger*.py
@@ -300,7 +300,7 @@ src/database/migrations/run_migration.py
 src/database/migrations/migration_tracker.py
 src/database/migrations/migration_registry.json
 
-# Python cache di migrations
+# Python cache in migrations
 src/database/migrations/__pycache__/
 src/database/migrations/*.pyc
 
@@ -335,9 +335,8 @@ config/
 data/backups/
 !data/backups/.gitkeep
 
-
 # ============================================
-# DATABASE BACKUPS - IGNORE SEMUA
+# DATABASE BACKUPS - IGNORE ALL
 # ============================================
 backups/
 backups/migrations/
@@ -345,3 +344,15 @@ backups/migrations/
 *.db-backup
 data/backups/
 !data/backups/.gitkeep
+
+# ============================================
+# PROGRESS TRACKER FILES
+# ============================================
+P1_*.json
+P1_*_validation_*.json
+validation_results/
+*.progress.json
+*.tracker.json
+
+# Specific validation files
+P1_1_4_git_validation_*.json
