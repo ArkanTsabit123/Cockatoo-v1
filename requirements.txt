@@ -1,9 +1,10 @@
 # ============================================
 # Cockatoo_v1 - Python 3.10.11 requirements file
+# Generated from installed packages
 # Version: 1.1.0 | Python: 3.10.11
 # ============================================
 
-# CORE DEPENDENCIES (MUST HAVE)
+# CORE DEPENDENCIES
 # ------------------------------
 setuptools==68.2.0
 wheel==0.41.0
@@ -22,31 +23,52 @@ transformers==4.40.0
 sentence-transformers==2.2.2
 accelerate==0.25.0
 tokenizers==0.19.0
+safetensors==0.7.0
+sentencepiece==0.2.1
+regex==2026.1.15
+filelock==3.20.3
 
-# LangChain ecosystem (UPDATED VERSIONS)
+# LangChain ecosystem
 langchain==0.1.20
 langchain-community==0.0.38
 langchain-core==0.1.53
 langchain-text-splitters==0.0.2
-# langchain-ollama>=0.1.3,<0.2.0
 langchain-chroma==0.1.4
+langsmith==0.1.147
+tenacity==8.5.0
 
-# OpenAI API (optional)
+# OpenAI API
 openai==2.16.0
+distro==1.9.0
+jiter==0.13.0
 
 # Numerical computing
 numpy==1.24.4
 scipy==1.15.3
 scikit-learn==1.3.0
+threadpoolctl==3.6.0
 
 # HuggingFace ecosystem
 huggingface-hub==0.36.0
 datasets==4.5.0
+fsspec==2025.10.0
+dill==0.4.0
+multiprocess==0.70.18
+xxhash==3.6.0
+pyarrow==23.0.0
 
 # VECTOR DATABASE & SEARCH
 # ------------------------
 chromadb==0.4.18
+chroma-hnswlib==0.7.3
 hnswlib==0.7.0
+mmh3==5.2.0
+posthog==2.5.0
+kubernetes==35.0.0
+pulsar-client==3.9.0
+onnxruntime==1.23.2
+flatbuffers==25.12.19
+PyPika==0.51.0
 
 # DOCUMENT PROCESSING
 # -------------------
@@ -54,65 +76,88 @@ hnswlib==0.7.0
 PyPDF2==3.0.1
 pdfplumber==0.10.2
 pypdf==3.17.0
+pypdfium2==5.3.0
+pdfminer.six==20221105
 
 # Office documents
 python-docx==0.8.11
 openpyxl==3.1.0
+et_xmlfile==2.0.0
+xlsxwriter==3.2.9
 
 # Ebooks
 ebooklib==0.18
 
 # Web content
 beautifulsoup4==4.12.2
+soupsieve==2.8.3
 lxml==4.9.0
 html5lib==1.1
+webencodings==0.5.1
 
 # Text processing
 markdown-it-py==3.0.0
+mdurl==0.1.2
 python-frontmatter==1.0.0
 
 # Data processing
 pandas==2.1.0
+pytz==2025.2
+tzdata==2025.3
 
 # Images & text extraction
 Pillow==10.0.0
 markdown==3.5
 chardet==5.2.0
+pytesseract==0.3.10
 
 # DESKTOP GUI
 # -----------
 customtkinter==5.2.0
+darkdetect==0.8.0
 tkinterweb==4.17.1
+tkinterweb-tkhtml==2.1.0
+Pillow==10.0.0
 
 # DATABASE & STORAGE
 # ------------------
 sqlalchemy==2.0.0
+greenlet==3.3.1
 alembic==1.13.0
+Mako==1.3.10
 
 # ============================================
-# CODE QUALITY & ANALYSIS TOOLS (NEW SECTION)
+# CODE QUALITY & ANALYSIS TOOLS
 # ============================================
-
 # Static analysis
-astroid==3.0.1              # For AST parsing in tracker
-pylint==3.2.2               # For code quality analysis (optional)
-bandit==1.7.8               # For security analysis (optional)
-radon==6.0.1                # For complexity analysis (optional)
+astroid==4.0.3
+pylint==4.0.4
+bandit==1.9.3
+radon==6.0.1
+stevedore==5.6.0
+mando==0.7.1
+tomlkit==0.14.0
+tomli==2.4.0
 
 # Code formatting & linting
 black==26.1.0
+mypy_extensions==1.1.0
+pathspec==1.0.4
 flake8==7.0.0
-isort==5.13.2               # For import organization checking
+pycodestyle==2.11.1
+pyflakes==3.2.0
+isort==7.0.0
 
 # Type checking
 mypy==1.19.1
+typing_extensions==4.15.0
 
 # Reporting & visualization
-tabulate==0.9.0             # For table formatting in reports
-colorama==0.4.6             # For colored terminal output
+tabulate==0.9.0
+colorama==0.4.6
 
 # ============================================
-# UTILITIES (CONTINUED)
+# UTILITIES
 # ============================================
 # Configuration
 pyyaml==6.0
@@ -120,7 +165,21 @@ python-dotenv==1.0.0
 
 # Networking
 requests==2.32.5
+urllib3==2.6.3
+certifi==2026.1.4
+charset-normalizer==3.4.4
+idna==3.11
 aiohttp==3.9.0
+aiosignal==1.4.0
+frozenlist==1.8.0
+multidict==6.7.1
+propcache==0.4.1
+yarl==1.22.0
+aiohappyeyeballs==2.6.1
+httpx==0.25.2
+httpcore==1.0.9
+h11==0.16.0
+sniffio==1.3.1
 
 # System & monitoring
 psutil==5.9.0
@@ -129,14 +188,23 @@ watchdog==3.0.0
 # CLI & output
 click==8.1.0
 rich==13.0.0
+pygments==2.19.2
+commonmark==0.9.1
 tqdm==4.67.1
+typer==0.21.1
+shellingham==1.5.4
 
 # Data serialization
 orjson==3.9.14
 python-multipart==0.0.6
+toml==0.10.2
+pytokens==0.4.1
 
 # Security
 cryptography==41.0.0
+cffi==2.0.0
+pycparser==3.0
+bcrypt==5.0.0
 
 # Performance
 cachetools==5.3.0
@@ -144,44 +212,186 @@ joblib==1.3.0
 
 # Logging
 structlog==25.5.0
+coloredlogs==15.0.1
+humanfriendly==10.0
+pyreadline3==3.5.4
 
 # Typing & validation
 typing-extensions==4.15.0
 jsonschema==4.19.0
+jsonschema-specifications==2025.9.1
+referencing==0.37.0
+rpds-py==0.30.0
 pydantic==2.5.0
+pydantic_core==2.14.1
+annotated-types==0.7.0
 pydantic-settings==2.1.0
+python-dotenv==1.0.0
+typing-inspect==0.9.0
+mypy_extensions==1.1.0
+typing-inspection==0.4.2
+marshmallow==3.26.2
+dataclasses-json==0.6.7
 
-# WEB FRAMEWORK (Optional)
+# WEB FRAMEWORK
 # ------------------------
 fastapi==0.104.0
+starlette==0.27.0
+anyio==3.7.1
 uvicorn[standard]==0.40.0
+httptools==0.7.1
+watchfiles==1.1.1
+websockets==16.0
 
-# LOCAL LLM (Optional)
+# LOCAL LLM
 # --------------------
 ollama==0.1.0
 
-# WEB UI (Optional)
+# WEB UI
 # -----------------
 streamlit==1.28.0
+altair==5.5.0
+narwhals==2.16.0
+blinker==1.9.0
+gitpython==3.1.46
+gitdb==4.0.12
+smmap==5.0.2
+pydeck==0.9.1
+tenacity==8.5.0
+toml==0.10.2
+tzlocal==5.3.1
+validators==0.35.0
 
-# DEVELOPMENT & TESTING (Optional)
-# --------------------------------
+# ============================================
+# DEVELOPMENT & TESTING
+# ============================================
 # Testing
 pytest==7.4.0
+pluggy==1.6.0
+iniconfig==2.3.0
+exceptiongroup==1.3.1
 pytest-asyncio==0.23.0
-
-
-# Code quality tools (already in new section above)
+pytest-cov==4.0.0
+coverage==7.13.3
+pytest-mock==3.0.0
 
 # Jupyter & interactive
 ipython==8.12.0
+backcall==0.2.0
+decorator==5.2.1
+jedi==0.19.2
+parso==0.8.5
+pickleshare==0.7.5
+prompt_toolkit==3.0.52
+wcwidth==0.5.3
+pygments==2.19.2
+stack-data==0.6.3
+asttokens==3.0.1
+executing==2.2.1
+pure-eval==0.2.3
+traitlets==5.14.3
+matplotlib-inline==0.2.1
+
 jupyter==1.0.0
+jupyter-console==6.6.3
+qtconsole==5.7.0
+QtPy==2.4.3
+ipykernel==7.1.0
+comm==0.2.3
+debugpy==1.8.20
+nest-asyncio==1.6.0
+ipywidgets==8.1.8
+widgetsnbextension==4.0.15
+notebook==7.5.3
+jupyter-server==2.17.0
+jupyter_client==8.8.0
+jupyter_core==5.9.1
+platformdirs==4.1.0
+pywinpty==3.0.2
+jupyter-events==0.12.0
+python-json-logger==4.0.0
+rfc3339-validator==0.1.4
+rfc3986-validator==0.1.1
+jsonschema==4.19.0
+referencing==0.37.0
+rpds-py==0.30.0
+jupyter_server_terminals==0.5.4
+terminado==0.18.1
+nbclassic==1.2.0
+notebook-shim==0.2.4
+nbconvert==7.17.0
+beautifulsoup4==4.12.2
+bleach==6.3.0
+defusedxml==0.7.1
+tinycss2==1.4.0
+mistune==3.2.0
+nbclient==0.10.4
+nbformat==5.10.4
+fastjsonschema==2.21.2
+pandocfilters==1.5.1
 jupyterlab==4.5.3
+jupyterlab_server==2.28.0
+babel==2.18.0
+json5==0.13.0
+jupyter-lsp==2.3.0
+jupyterlab_pygments==0.3.0
+async-lru==2.1.0
 
 # PACKAGING
 # ---------
-packaging==23.2
+packaging==26.0
 platformdirs==4.1.0
-pytest-cov==4.0.0
-pytest-mock==3.0.0
-pytesseract==0.3.10
+build==1.4.0
+pyproject_hooks==1.2.0
+importlib_metadata==6.11.0
+zipp==3.23.0
+importlib_resources==6.5.2
+
+# ADDITIONAL DEPENDENCIES
+# -----------------------
+# gRPC & Protobuf
+grpcio==1.76.0
+protobuf==6.33.5
+googleapis-common-protos==1.72.0
+
+# OpenTelemetry
+opentelemetry-api==1.39.1
+opentelemetry-sdk==1.39.1
+opentelemetry-semantic-conventions==0.60b1
+opentelemetry-instrumentation==0.60b1
+opentelemetry-instrumentation-asgi==0.60b1
+opentelemetry-instrumentation-fastapi==0.60b1
+opentelemetry-exporter-otlp-proto-grpc==1.39.1
+opentelemetry-exporter-otlp-proto-common==1.39.1
+opentelemetry-proto==1.39.1
+opentelemetry-util-http==0.60b1
+
+# OAuth
+oauthlib==3.3.1
+requests-oauthlib==2.0.0
+requests-toolbelt==1.0.0
+
+# Other
+asgiref==3.11.1
+annotated-doc==0.0.4
+argon2-cffi==25.1.0
+argon2-cffi-bindings==25.1.0
+arrow==1.4.0
+python-dateutil==2.9.0.post0
+six==1.17.0
+attrs==25.4.0
+backoff==2.2.1
+durationpy==0.10
+fqdn==1.5.1
+isoduration==20.11.0
+jsonpointer==3.0.0
+jsonpatch==1.33
+librt==0.7.8
+overrides==7.7.0
+prometheus_client==0.24.1
+Send2Trash==2.1.0
+uri-template==1.3.0
+webcolors==25.10.0
+websocket-client==1.9.0
+wrapt==1.17.3
+tzlocal==5.3.1
