@@ -1,4 +1,4 @@
-# # cockatoo_v1/src/document_processing/processor.py
+# cockatoo_v1/src/document_processing/processor.py
 
 """
 processor.py
@@ -21,13 +21,16 @@ import sys
 import re
 import json
 import hashlib
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple, Union, Generator
 from dataclasses import dataclass, asdict, field
-import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 # Import local modules
 from .cleaning import TextCleaner, CleaningConfig
@@ -46,6 +49,7 @@ try:
 except ImportError as e:
     HAS_EXTRACTORS = False
     logger.warning(f"Extractor modules not available: {e}. Some functionality will be limited.")
+
 
 @dataclass
 class ProcessingConfig:
@@ -95,6 +99,7 @@ class ProcessingConfig:
         
         if self.intermediate_dir is None:
             self.intermediate_dir = 'data/processed'
+
 
 @dataclass
 class ProcessingResult:
@@ -150,6 +155,7 @@ class ProcessingResult:
             'success_rate': 1.0 if self.status == 'completed' else 0.0,
         }
 
+
 class DocumentProcessor:
     """
     Main document processing pipeline orchestrator.
@@ -189,14 +195,21 @@ class DocumentProcessor:
         'web': 'WebExtractor',
     }
     
-    def __init__(self, config: Optional[ProcessingConfig] = None):
+    def __init__(self, config: Optional[Union[ProcessingConfig, Dict]] = None):
         """
         Initialize document processor with configuration.
         
         Args:
-            config: Processing configuration. Uses defaults if None.
+            config: Processing configuration. Can be ProcessingConfig object or dict.
+                   Uses defaults if None.
         """
-        self.config = config or ProcessingConfig()
+        # Handle if config is a dict (from tests)
+        if config is not None and isinstance(config, dict):
+            self.config = ProcessingConfig(**config)
+        elif config is None:
+            self.config = ProcessingConfig()
+        else:
+            self.config = config
         
         # Initialize components
         self._initialize_components()
@@ -982,6 +995,7 @@ class DocumentProcessor:
         else:
             return content
 
+
 # ========== CONVENIENCE FUNCTIONS ==========
 
 def process_document(file_path: Union[str, Path], 
@@ -998,6 +1012,7 @@ def process_document(file_path: Union[str, Path],
     """
     processor = DocumentProcessor(config)
     return processor.process_document(file_path)
+
 
 def batch_process_documents(file_paths: List[Union[str, Path]], 
                            config: Optional[ProcessingConfig] = None,
@@ -1016,6 +1031,7 @@ def batch_process_documents(file_paths: List[Union[str, Path]],
     processor = DocumentProcessor(config)
     return processor.batch_process(file_paths, max_workers)
 
+
 def process_directory_contents(directory_path: Union[str, Path], 
                               config: Optional[ProcessingConfig] = None,
                               recursive: bool = True) -> List[ProcessingResult]:
@@ -1032,6 +1048,30 @@ def process_directory_contents(directory_path: Union[str, Path],
     """
     processor = DocumentProcessor(config)
     return processor.process_directory(directory_path, recursive)
+
+
+# ========== SINGLETON ACCESSOR ==========
+
+_processor_instance = None
+
+def get_processor(config: Optional[Union[ProcessingConfig, Dict]] = None) -> DocumentProcessor:
+    """
+    Get or create a singleton DocumentProcessor instance.
+    
+    Args:
+        config: Optional processing configuration. Can be ProcessingConfig object or dict.
+        
+    Returns:
+        DocumentProcessor instance.
+    """
+    global _processor_instance
+    if _processor_instance is None:
+        _processor_instance = DocumentProcessor(config)
+    elif config is not None:
+        # If config provided and different, create new instance
+        _processor_instance = DocumentProcessor(config)
+    return _processor_instance
+
 
 # ========== TESTING AND VALIDATION ==========
 
@@ -1098,6 +1138,7 @@ def test_processor() -> Dict[str, bool]:
             pass
     
     return test_results
+
 
 # ========== MAIN MODULE EXECUTION ==========
 
