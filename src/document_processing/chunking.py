@@ -1263,7 +1263,7 @@ def _test_chunking() -> Dict[str, bool]:
 
 
 # ========== MAIN MODULE EXECUTION ==========
-
+Chunk = TextChunk
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Intelligent Text Chunking")
     parser.add_argument("--text", type=str, help="Text to chunk (or file path)")
@@ -1279,6 +1279,7 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     
     args = parser.parse_args()
+    
     
     # Set up logging
     log_level = logging.DEBUG if args.verbose else logging.INFO
