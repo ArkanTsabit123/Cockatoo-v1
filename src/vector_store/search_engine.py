@@ -1,4 +1,4 @@
-# cockatoo_v1/src/vector_store/search_engine.py
+# src/vector_store/search_engine.py
 
 """
 Search Engine for cockatoo_v1 Vector Store.
@@ -27,10 +27,8 @@ import uuid
 
 try:
     from .chroma_client import ChromaClient, get_chroma_client
-    from .faiss_client import FAISSClient, get_faiss_client
 except ImportError:
     from chroma_client import ChromaClient, get_chroma_client
-    from faiss_client import FAISSClient, get_faiss_client
 
 try:
     from ..core.constants import CACHE_DIR
@@ -471,13 +469,13 @@ class SearchEngine:
     def __init__(
         self,
         chroma_client: Optional[ChromaClient] = None,
-        faiss_client: Optional[FAISSClient] = None,
+        faiss_client: Optional[Any] = None,
         cache_dir: Optional[Path] = None,
         config: Optional[Dict[str, Any]] = None
     ):
         """Initialize search engine."""
         self.chroma = chroma_client or get_chroma_client()
-        self.faiss = faiss_client or get_faiss_client()
+        self.faiss = faiss_client
 
         self.config = {
             "default_top_k": 10,
@@ -535,7 +533,9 @@ class SearchEngine:
         start_time = time.time()
 
         if indices is None:
-            indices = ["chroma", "faiss"]
+            indices = ["chroma"]
+            if self.faiss:
+                indices.append("faiss")
 
         if use_cache and self.cache and query_embeddings is None:
             cache_params = {
@@ -579,7 +579,7 @@ class SearchEngine:
                 with self.stats_lock:
                     self.stats["chroma_searches"] += 1
 
-            if "faiss" in indices and query_embeddings:
+            if "faiss" in indices and self.faiss and query_embeddings:
                 faiss_results = self._search_faiss(
                     query_embeddings=query_embeddings,
                     n_results=n_results * 2,
@@ -653,7 +653,7 @@ class SearchEngine:
                 metadata = chroma_results["metadatas"][i]
                 doc_id = chroma_results["ids"][i]
 
-                similarity = self.chroma._distance_to_similarity(dist)
+                similarity = self._distance_to_similarity(dist)
                 if similarity >= threshold:
                     results.append(SearchResult(
                         document=doc,
@@ -678,12 +678,19 @@ class SearchEngine:
         """Search in FAISS."""
         results = []
 
+        if not self.faiss:
+            return results
+
         try:
-            faiss_results = self.faiss.search_with_embeddings(
-                query_embeddings=query_embeddings,
-                n_results=n_results,
-                where=where
-            )
+            if hasattr(self.faiss, 'search_with_embeddings'):
+                faiss_results = self.faiss.search_with_embeddings(
+                    query_embeddings=query_embeddings,
+                    n_results=n_results,
+                    where=where
+                )
+            else:
+                logger.warning("FAISS client does not support search_with_embeddings")
+                return []
 
             if faiss_results.get("error"):
                 logger.warning(f"FAISS search error: {faiss_results['error']}")
@@ -695,7 +702,7 @@ class SearchEngine:
                 metadata = faiss_results["metadatas"][i]
                 doc_id = faiss_results["ids"][i]
 
-                similarity = self.faiss._distance_to_similarity(dist)
+                similarity = self._distance_to_similarity(dist)
                 if similarity >= threshold:
                     results.append(SearchResult(
                         document=doc,
@@ -709,6 +716,13 @@ class SearchEngine:
             logger.error(f"FAISS search failed: {error}")
 
         return results
+
+    def _distance_to_similarity(self, distance: float) -> float:
+        """Convert distance to similarity score (0-1)."""
+        if distance <= 0:
+            return 1.0
+        similarity = 1.0 / (1.0 + distance)
+        return similarity
 
     def hybrid_search(
         self,
@@ -781,7 +795,7 @@ class SearchEngine:
         all_results = []
 
         for i, query in enumerate(queries):
-            embeddings = query_embeddings_list[i] if query_embeddings_list else None
+            embeddings = query_embeddings_list[i] if query_embeddings_list and i < len(query_embeddings_list) else None
 
             results = self.search(
                 query=query,
@@ -907,18 +921,16 @@ class SearchEngine:
         """Perform health check on search engine."""
         try:
             chroma_health = self.chroma.health_check()
-            faiss_health = self.faiss.health_check()
-            cache_healthy = self.cache is not None
 
             overall_status = "healthy"
-            if chroma_health["status"] != "healthy" or faiss_health["status"] != "healthy":
+            if chroma_health["status"] != "healthy":
                 overall_status = "degraded"
 
             return {
                 "status": overall_status,
                 "chroma": chroma_health,
-                "faiss": faiss_health,
-                "cache_enabled": cache_healthy,
+                "faiss": {"status": "not_configured"} if not self.faiss else {"status": "healthy"},
+                "cache_enabled": self.cache is not None,
                 "cache_stats": self.cache.get_stats() if self.cache else None,
                 "search_stats": self.get_stats(),
                 "timestamp": datetime.now().isoformat()
@@ -942,7 +954,10 @@ class SearchEngine:
 
     def __del__(self):
         """Cleanup on deletion."""
-        self.close()
+        try:
+            self.close()
+        except Exception:
+            pass
 
 
 _search_engine_instance: Optional[SearchEngine] = None
@@ -950,7 +965,7 @@ _search_engine_instance: Optional[SearchEngine] = None
 
 def get_search_engine(
     chroma_client: Optional[ChromaClient] = None,
-    faiss_client: Optional[FAISSClient] = None,
+    faiss_client: Optional[Any] = None,
     cache_dir: Optional[Path] = None,
     config: Optional[Dict[str, Any]] = None
 ) -> SearchEngine:
