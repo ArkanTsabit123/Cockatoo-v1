@@ -109,7 +109,13 @@ class ChromaClient:
         timestamp = datetime.now().isoformat()
         for i, metadata in enumerate(metadatas):
             metadata["added_at"] = metadata.get("added_at", timestamp)
-            metadata["doc_length"] = metadata.get("doc_length", len(texts[i]))
+            
+            if hasattr(texts[i], 'text'):  
+                doc_length = len(texts[i].text)
+            else: 
+                doc_length = len(texts[i])
+            
+            metadata["doc_length"] = metadata.get("doc_length", doc_length)
 
         try:
             if embeddings:
@@ -364,6 +370,12 @@ class ChromaClient:
     ) -> bool:
         """Update an existing document."""
         try:
+            # First check if document exists
+            existing = self.get_document(doc_id)
+            if existing is None:
+                logger.warning(f"Document not found: {doc_id}")
+                return False
+                
             update_data = {}
             if text is not None:
                 update_data["documents"] = [text]
@@ -446,6 +458,9 @@ class ChromaClient:
     def health_check(self) -> Dict[str, Any]:
         """Perform a health check on the vector store."""
         try:
+            # Try to actually connect to the database by performing a simple operation
+            self.collection.count()
+            
             info = self.get_collection_info()
             return {
                 "status": "healthy",
@@ -461,6 +476,7 @@ class ChromaClient:
                 "error": str(error),
                 "timestamp": datetime.now().isoformat()
             }
+
 
     def set_top_k(self, k: int) -> None:
         """Set the default number of results for search operations."""
