@@ -1,7 +1,7 @@
 # cockatoo_v1/src/document_processing/extractors/pdf_extractor.py
 
 """
-PDF document extractor using PyPDF2 and pdfplumber for text extraction.
+PDF document extractor using pypdf and pdfplumber for text extraction.
 """
 
 import os
@@ -11,10 +11,10 @@ from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 
 try:
-    import PyPDF2
-    HAS_PYPDF2 = True
+    import pypdf
+    HAS_PYPDF = True
 except ImportError:
-    HAS_PYPDF2 = False
+    HAS_PYPDF = False
 
 try:
     import pdfplumber
@@ -29,26 +29,26 @@ logger = logging.getLogger(__name__)
 
 class PDFExtractor(BaseExtractor):
     """
-    PDF document extractor that combines PyPDF2 and pdfplumber
+    PDF document extractor that combines pypdf and pdfplumber
     for optimal text extraction.
     """
     
-    def __init__(self, use_pdfplumber: bool = True, use_pypdf2: bool = True):
+    def __init__(self, use_pdfplumber: bool = True, use_pypdf: bool = True):
         """
         Initialize PDF extractor.
         
         Args:
             use_pdfplumber: Use pdfplumber for detailed text extraction
-            use_pypdf2: Use PyPDF2 for metadata and fallback extraction
+            use_pypdf: Use pypdf for metadata and fallback extraction
         """
         super().__init__()
         self.use_pdfplumber = use_pdfplumber and HAS_PDFPLUMBER
-        self.use_pypdf2 = use_pypdf2 and HAS_PYPDF2
+        self.use_pypdf = use_pypdf and HAS_PYPDF
         
-        if not self.use_pdfplumber and not self.use_pypdf2:
+        if not self.use_pdfplumber and not self.use_pypdf:
             raise ImportError(
-                "Neither PyPDF2 nor pdfplumber is available. "
-                "Please install at least one: pip install pypdf2 pdfplumber"
+                "Neither pypdf nor pdfplumber is available. "
+                "Please install at least one: pip install pypdf pdfplumber"
             )
     
     def get_supported_formats(self) -> List[str]:
@@ -109,17 +109,17 @@ class PDFExtractor(BaseExtractor):
                 result["extraction_method"] = "pdfplumber"
             except Exception as e:
                 logger.warning(f"pdfplumber extraction failed: {e}")
-                if self.use_pypdf2:
-                    logger.info("Falling back to PyPDF2")
+                if self.use_pypdf:
+                    logger.info("Falling back to pypdf")
         
-        # Extract with PyPDF2 (fallback or for metadata)
-        if result["text"] == "" and self.use_pypdf2:
+        # Extract with pypdf (fallback or for metadata)
+        if result["text"] == "" and self.use_pypdf:
             try:
-                result = self._extract_with_pypdf2(file_path, result)
+                result = self._extract_with_pypdf(file_path, result)
                 if result["extraction_method"] == "none":
-                    result["extraction_method"] = "pypdf2"
+                    result["extraction_method"] = "pypdf"
             except Exception as e:
-                logger.error(f"PyPDF2 extraction also failed: {e}")
+                logger.error(f"pypdf extraction also failed: {e}")
         
         if result["text"] == "":
             logger.error(f"Failed to extract text from PDF: {file_path}")
@@ -196,9 +196,9 @@ class PDFExtractor(BaseExtractor):
         
         return result
     
-    def _extract_with_pypdf2(self, file_path: Path, result: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_with_pypdf(self, file_path: Path, result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Extract text using PyPDF2.
+        Extract text using pypdf.
         
         Args:
             file_path: Path to PDF file
@@ -210,7 +210,7 @@ class PDFExtractor(BaseExtractor):
         extracted_text = []
         
         with open(file_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
+            pdf_reader = pypdf.PdfReader(file)
             
             result["page_count"] = len(pdf_reader.pages)
             
@@ -257,9 +257,9 @@ class PDFExtractor(BaseExtractor):
         metadata = {}
         
         try:
-            if self.use_pypdf2:
+            if self.use_pypdf:
                 with open(file_path, 'rb') as file:
-                    pdf_reader = PyPDF2.PdfReader(file)
+                    pdf_reader = pypdf.PdfReader(file)
                     if pdf_reader.metadata:
                         raw_metadata = pdf_reader.metadata
                         metadata = {
@@ -273,7 +273,7 @@ class PDFExtractor(BaseExtractor):
                             "encrypted": pdf_reader.is_encrypted,
                         }
         except Exception as e:
-            logger.warning(f"Failed to extract metadata with PyPDF2: {e}")
+            logger.warning(f"Failed to extract metadata with pypdf: {e}")
         
         return metadata
     
@@ -355,11 +355,11 @@ class PDFExtractor(BaseExtractor):
             validation["errors"].append("File does not exist")
             return validation
         
-        # Check with PyPDF2
-        if self.use_pypdf2:
+        # Check with pypdf
+        if self.use_pypdf:
             try:
                 with open(file_path, 'rb') as file:
-                    pdf_reader = PyPDF2.PdfReader(file)
+                    pdf_reader = pypdf.PdfReader(file)
                     
                     validation["page_count"] = len(pdf_reader.pages)
                     validation["is_encrypted"] = pdf_reader.is_encrypted
@@ -379,7 +379,7 @@ class PDFExtractor(BaseExtractor):
                         validation["warnings"].append("PDF appears to have no extractable text (may be scanned)")
             
             except Exception as e:
-                validation["errors"].append(f"PyPDF2 validation failed: {e}")
+                validation["errors"].append(f"pypdf validation failed: {e}")
         
         return validation
     
@@ -425,18 +425,18 @@ class PDFExtractor(BaseExtractor):
 
 # ====== FACTORY FUNCTIONS ======
 
-def create_pdf_extractor(use_pdfplumber: bool = True, use_pypdf2: bool = True) -> PDFExtractor:
+def create_pdf_extractor(use_pdfplumber: bool = True, use_pypdf: bool = True) -> PDFExtractor:
     """
     Factory function to create PDF extractor instance.
     
     Args:
         use_pdfplumber: Whether to use pdfplumber
-        use_pypdf2: Whether to use PyPDF2
+        use_pypdf: Whether to use pypdf
     
     Returns:
         PDFExtractor instance
     """
-    return PDFExtractor(use_pdfplumber=use_pdfplumber, use_pypdf2=use_pypdf2)
+    return PDFExtractor(use_pdfplumber=use_pdfplumber, use_pypdf=use_pypdf)
 
 
 # Register with the extractor system
