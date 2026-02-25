@@ -1,4 +1,4 @@
-# cockatoo_v1/src/vector_store/index_manager.py
+# src/vector_store/index_manager.py
 
 """
 Index Manager for cockatoo_v1 Vector Store.
@@ -156,9 +156,12 @@ class IndexManager:
     def _stop_maintenance_thread(self) -> None:
         """Stop background maintenance thread."""
         self.maintenance_running = False
-        if self.maintenance_thread and self.maintenance_thread.is_alive():
-            self.maintenance_queue.put(None)
-            self.maintenance_thread.join(timeout=5)
+        if hasattr(self, 'maintenance_thread') and self.maintenance_thread and self.maintenance_thread.is_alive():
+            try:
+                self.maintenance_queue.put(None)
+                self.maintenance_thread.join(timeout=5)
+            except Exception:
+                pass
             logger.info("Maintenance thread stopped")
 
     def _maintenance_worker(self) -> None:
@@ -184,10 +187,11 @@ class IndexManager:
 
                 self._clean_old_backups()
 
-                self.maintenance_queue.get(timeout=3600)
+                try:
+                    self.maintenance_queue.get(timeout=3600)
+                except queue.Empty:
+                    continue
 
-            except queue.Empty:
-                continue
             except Exception as error:
                 logger.error(f"Maintenance worker error: {error}")
                 time.sleep(60)
@@ -383,22 +387,23 @@ class IndexManager:
 
             index_path = Path(index["path"])
             if index_path.exists():
-                shutil.make_archive(
+                archive_format = "gztar" if self.config["maintenance"]["compression_enabled"] else "tar"
+                archive_path = shutil.make_archive(
                     str(backup_path),
-                    "gztar" if self.config["maintenance"]["compression_enabled"] else "tar",
+                    archive_format,
                     index_path
                 )
 
                 for idx in self.index_metadata["indices"]:
                     if idx["id"] == index["id"]:
                         idx["last_backup"] = datetime.now().isoformat()
-                        idx["last_backup_path"] = f"{backup_path}.tar.gz" if self.config["maintenance"]["compression_enabled"] else f"{backup_path}.tar"
+                        idx["last_backup_path"] = archive_path
                         break
 
                 self._save_metadata()
 
-                logger.info(f"Created backup for index {name}: {backup_path}")
-                return backup_path
+                logger.info(f"Created backup for index {name}: {archive_path}")
+                return Path(archive_path)
 
             return None
 
@@ -453,7 +458,7 @@ class IndexManager:
             if index_type == "chroma":
                 self.create_chroma_index(name)
             else:
-                self.create_faiss_index(name)
+                self.create_faiss_index(name, dimension=384)
 
             logger.info(f"Restored index {original_name} to {name}")
             return True
@@ -475,18 +480,18 @@ class IndexManager:
                         backup_file.unlink()
                         logger.debug(f"Removed old backup: {backup_file}")
 
-                        total_size = sum(f.stat().st_size for f in self.backup_dir.glob("*.tar*"))
-                        max_size = self.config["maintenance"]["max_backup_size_mb"] * 1024 * 1024
+            total_size = sum(f.stat().st_size for f in self.backup_dir.glob("*.tar*"))
+            max_size = self.config["maintenance"]["max_backup_size_mb"] * 1024 * 1024
 
-                        if total_size > max_size:
-                            backups = sorted(self.backup_dir.glob("*.tar*"), key=lambda f: f.stat().st_mtime)
-                            for old_backup in backups:
-                                if total_size <= max_size:
-                                    break
-                                size = old_backup.stat().st_size
-                                old_backup.unlink()
-                                total_size -= size
-                                logger.info(f"Removed old backup due to size limit: {old_backup}")
+            if total_size > max_size:
+                backups = sorted(self.backup_dir.glob("*.tar*"), key=lambda f: f.stat().st_mtime)
+                for old_backup in backups:
+                    if total_size <= max_size:
+                        break
+                    size = old_backup.stat().st_size
+                    old_backup.unlink()
+                    total_size -= size
+                    logger.info(f"Removed old backup due to size limit: {old_backup}")
 
         except Exception as error:
             logger.error(f"Failed to clean old backups: {error}")
@@ -571,7 +576,7 @@ class IndexManager:
             backup_count = len(list(self.backup_dir.glob("*.tar*")))
             backup_size = sum(f.stat().st_size for f in self.backup_dir.glob("*.tar*")) / (1024 * 1024)
 
-            maintenance_running = self.maintenance_thread is not None and self.maintenance_thread.is_alive()
+            maintenance_running = hasattr(self, 'maintenance_thread') and self.maintenance_thread is not None and self.maintenance_thread.is_alive()
 
             return {
                 "status": "healthy",
@@ -594,9 +599,17 @@ class IndexManager:
                 "timestamp": datetime.now().isoformat()
             }
 
+    def close(self) -> None:
+        """Close the index manager and cleanup resources."""
+        self._stop_maintenance_thread()
+
     def __del__(self):
         """Cleanup on deletion."""
-        self._stop_maintenance_thread()
+        try:
+            if hasattr(self, 'maintenance_thread'):
+                self._stop_maintenance_thread()
+        except Exception:
+            pass
 
 
 _index_manager_instance: Optional[IndexManager] = None
