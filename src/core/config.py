@@ -105,42 +105,76 @@ class PathsConfig(ConfigSection):
     temp_dir: Path = Field(default_factory=lambda: Path.home() / ".cockatoo" / "temp", description="Temporary files directory")
     backup_dir: Path = Field(default_factory=lambda: Path.home() / ".cockatoo" / "backups", description="Backup directory")
     
-    @model_validator(mode='after')
-    def set_platform_specific_paths(self) -> 'PathsConfig':
-        """Set platform-specific paths based on detected platform."""
-        # Get base directory for current platform
+    def __init__(self, **data):
+        """Initialize with platform detection."""
+        # Detect platform if not provided
+        if 'platform' not in data:
+            system = platform.system().lower()
+            if system.startswith('win'):
+                data['platform'] = PlatformType.WINDOWS
+            elif system.startswith('darwin'):
+                data['platform'] = PlatformType.MACOS
+            elif system.startswith('linux'):
+                data['platform'] = PlatformType.LINUX
+            else:
+                data['platform'] = PlatformType.UNKNOWN
+        
+        super().__init__(**data)
+        
+        # Apply platform-specific paths immediately after initialization
+        self._apply_platform_specific_paths()
+    
+    def _apply_platform_specific_paths(self) -> None:
+        """Apply platform-specific paths based on detected platform."""
+        # Get platform-specific base directory
         base_dir = self._get_platform_base_dir()
+        home_dir = Path.home()
+        default_base = home_dir / ".cockatoo"
         
-        # Only override if using default home directory
-        if str(self.data_dir) == str(Path.home() / ".cockatoo"):
-            self.data_dir = base_dir
-        if str(self.models_dir) == str(Path.home() / ".cockatoo" / "models"):
-            self.models_dir = base_dir / "models"
-        if str(self.documents_dir) == str(Path.home() / ".cockatoo" / "documents"):
-            self.documents_dir = base_dir / "documents"
-        if str(self.database_dir) == str(Path.home() / ".cockatoo" / "database"):
-            self.database_dir = base_dir / "database"
-        if str(self.logs_dir) == str(Path.home() / ".cockatoo" / "logs"):
-            self.logs_dir = base_dir / "logs"
-        if str(self.exports_dir) == str(Path.home() / ".cockatoo" / "exports"):
-            self.exports_dir = base_dir / "exports"
-        if str(self.config_dir) == str(Path.home() / ".cockatoo" / "config"):
-            self.config_dir = base_dir / "config"
-        if str(self.cache_dir) == str(Path.home() / ".cockatoo" / "cache"):
-            self.cache_dir = base_dir / "cache"
-        if str(self.temp_dir) == str(Path.home() / ".cockatoo" / "temp"):
-            self.temp_dir = base_dir / "temp"
-        if str(self.backup_dir) == str(Path.home() / ".cockatoo" / "backups"):
-            self.backup_dir = base_dir / "backups"
+        # Update paths that are still using defaults
+        updates = {}
         
-        return self
+        if str(self.data_dir) == str(default_base):
+            updates['data_dir'] = base_dir
+        
+        if str(self.models_dir) == str(default_base / "models"):
+            updates['models_dir'] = base_dir / "models"
+        
+        if str(self.documents_dir) == str(default_base / "documents"):
+            updates['documents_dir'] = base_dir / "documents"
+        
+        if str(self.database_dir) == str(default_base / "database"):
+            updates['database_dir'] = base_dir / "database"
+        
+        if str(self.logs_dir) == str(default_base / "logs"):
+            updates['logs_dir'] = base_dir / "logs"
+        
+        if str(self.exports_dir) == str(default_base / "exports"):
+            updates['exports_dir'] = base_dir / "exports"
+        
+        if str(self.config_dir) == str(default_base / "config"):
+            updates['config_dir'] = base_dir / "config"
+        
+        if str(self.cache_dir) == str(default_base / "cache"):
+            updates['cache_dir'] = base_dir / "cache"
+        
+        if str(self.temp_dir) == str(default_base / "temp"):
+            updates['temp_dir'] = base_dir / "temp"
+        
+        if str(self.backup_dir) == str(default_base / "backups"):
+            updates['backup_dir'] = base_dir / "backups"
+        
+        # Apply updates
+        for key, value in updates.items():
+            object.__setattr__(self, key, value)
     
     def _get_platform_base_dir(self) -> Path:
         """Get platform-specific base directory."""
         home = Path.home()
         
         if self.platform == PlatformType.WINDOWS:
-            appdata = os.environ.get('APPDATA', '')
+            # Try APPDATA first, then fallback to AppData/Roaming
+            appdata = os.environ.get('APPDATA')
             if appdata:
                 return Path(appdata) / "cockatoo"
             return home / "AppData" / "Roaming" / "cockatoo"
@@ -149,13 +183,30 @@ class PathsConfig(ConfigSection):
             return home / "Library" / "Application Support" / "cockatoo"
         
         elif self.platform == PlatformType.LINUX:
-            xdg_data_home = os.environ.get('XDG_DATA_HOME', '')
+            # Try XDG_DATA_HOME first, then fallback to .local/share
+            xdg_data_home = os.environ.get('XDG_DATA_HOME')
             if xdg_data_home:
                 return Path(xdg_data_home) / "cockatoo"
             return home / ".local" / "share" / "cockatoo"
         
         else:
+            # Unknown platform - use home directory
             return home / ".cockatoo"
+    
+    @model_validator(mode='after')
+    def validate_and_update_paths(self) -> 'PathsConfig':
+        """Validate and update paths after model validation."""
+        # Re-apply platform-specific paths after validation
+        self._apply_platform_specific_paths()
+        return self
+    
+    def model_dump(self, **kwargs):
+        """Override model_dump to ensure paths are properly serialized."""
+        data = super().model_dump(**kwargs)
+        # Ensure platform is properly serialized
+        if 'platform' in data and isinstance(data['platform'], Enum):
+            data['platform'] = data['platform'].value
+        return data
 
 
 class DocumentProcessingConfig(ConfigSection):
@@ -496,11 +547,14 @@ class AppConfig(BaseModel):
             else:
                 processed_data[key] = value
         
-        # Ensure paths have platform info
+        # Ensure paths section exists
         if 'paths' not in processed_data:
             processed_data['paths'] = {}
+        
+        # Set platform in paths if not already set
         if isinstance(processed_data['paths'], dict):
-            processed_data['paths']['platform'] = platform_type
+            if 'platform' not in processed_data['paths']:
+                processed_data['paths']['platform'] = platform_type
         
         # Handle path expansion for data_dir
         if 'data_dir' in data and isinstance(data['data_dir'], str):
@@ -1055,7 +1109,7 @@ class AppConfig(BaseModel):
         """
         config_dict = self.model_dump(exclude={'config_file_path', 'is_loaded'})
         
-        # Convert Path objects and Enums to strings
+        # Convert Path objects and Enums to strings, and sets to lists
         def convert_values(obj: Any) -> Any:
             if isinstance(obj, Path):
                 return str(obj)
@@ -1063,6 +1117,8 @@ class AppConfig(BaseModel):
                 return obj.value
             elif isinstance(obj, datetime):
                 return obj.isoformat()
+            elif isinstance(obj, set):
+                return [convert_values(item) for item in obj]
             elif isinstance(obj, dict):
                 return {k: convert_values(v) for k, v in obj.items()}
             elif isinstance(obj, list):
@@ -1239,18 +1295,22 @@ class AppConfig(BaseModel):
         try:
             config_dict = self.to_dict()
             
-            with open(export_path, 'w', encoding='utf-8') as f:
-                if format == 'json':
-                    json.dump(config_dict, f, indent=2, ensure_ascii=False)
-                elif format == 'toml':
-                    if not TOML_WRITER_AVAILABLE:
-                        logger.warning("TOML writer not available (install tomli-w). Falling back to YAML.")
-                        export_path = export_path.with_suffix('.yaml')
+            # Remove any set objects (convert to list) - already handled in to_dict
+            if format == 'json':
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_dict, f, indent=2, ensure_ascii=False, default=str)
+            elif format == 'toml':
+                if not TOML_WRITER_AVAILABLE:
+                    logger.warning("TOML writer not available (install tomli-w). Falling back to YAML.")
+                    export_path = export_path.with_suffix('.yaml')
+                    with open(export_path, 'w', encoding='utf-8') as f:
                         yaml.dump(config_dict, f, default_flow_style=False, indent=2)
-                    else:
+                else:
+                    with open(export_path, 'wb') as f:
                         tomli_w.dump(config_dict, f)
-                else:  # yaml
-                    yaml.dump(config_dict, f, default_flow_style=False, indent=2)
+            else:  # yaml
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    yaml.dump(config_dict, f, default_flow_style=False, indent=2, sort_keys=False)
             
             logger.info(f"Configuration exported to {export_path}")
             return True
