@@ -5,7 +5,9 @@ Extractors package for Cockatoo document processing.
 Contains format-specific document extractors with registry system.
 """
 
+import logging
 from typing import Dict, List, Type, Optional, Any, Callable
+
 from .base_extractor import BaseExtractor
 from .pdf_extractor import PDFExtractor
 from .txt_extractor import TXTExtractor
@@ -24,6 +26,79 @@ from .web_extractor import WebExtractor
 # ====== GLOBAL REGISTRIES ======
 _EXTRACTOR_REGISTRY: Dict[str, Type[BaseExtractor]] = {}
 _FACTORY_REGISTRY: Dict[str, Callable] = {}
+
+
+# ====== SPECIALIZED FACTORY FUNCTIONS ======
+# DEFINE THESE FIRST before they are used in _initialize_registries
+
+def create_pdf_extractor(
+    use_pdfplumber: bool = True, 
+    use_pypdf2: bool = True
+) -> PDFExtractor:
+    """Create a PDF extractor with custom settings."""
+    return PDFExtractor(use_pdfplumber=use_pdfplumber, use_pypdf2=use_pypdf2)
+
+
+def create_image_extractor(
+    use_ocr: bool = True, 
+    ocr_languages: Optional[List[str]] = None
+) -> ImageExtractor:
+    """Create an image extractor with custom settings."""
+    return ImageExtractor(use_ocr=use_ocr, ocr_languages=ocr_languages)
+
+
+def create_web_extractor(
+    timeout: int = 30, 
+    max_retries: int = 3
+) -> WebExtractor:
+    """Create a web extractor with custom settings."""
+    return WebExtractor(timeout=timeout, max_retries=max_retries)
+
+
+# Simple factory functions for backward compatibility
+def create_docx_extractor():
+    """Create DOCX extractor instance."""
+    return DOCXExtractor()
+
+
+def create_txt_extractor():
+    """Create TXT extractor instance."""
+    return TXTExtractor()
+
+
+def create_markdown_extractor():
+    """Create Markdown extractor instance."""
+    return MarkdownExtractor()
+
+
+def create_html_extractor():
+    """Create HTML extractor instance."""
+    return HTMLExtractor()
+
+
+def create_csv_extractor():
+    """Create CSV extractor instance."""
+    return CSVExtractor()
+
+
+def create_epub_extractor():
+    """Create EPUB extractor instance."""
+    return EPUBExtractor()
+
+
+def create_json_extractor():
+    """Create JSON extractor instance."""
+    return JSONExtractor()
+
+
+def create_pptx_extractor():
+    """Create PPTX extractor instance."""
+    return PPTXExtractor()
+
+
+def create_xlsx_extractor():
+    """Create XLSX extractor instance."""
+    return XLSXExtractor()
 
 
 def _initialize_registries():
@@ -96,6 +171,15 @@ def _initialize_registries():
         'pdf': create_pdf_extractor,
         'image': create_image_extractor,
         'web': create_web_extractor,
+        'docx': create_docx_extractor,
+        'txt': create_txt_extractor,
+        'markdown': create_markdown_extractor,
+        'html': create_html_extractor,
+        'csv': create_csv_extractor,
+        'epub': create_epub_extractor,
+        'json': create_json_extractor,
+        'pptx': create_pptx_extractor,
+        'xlsx': create_xlsx_extractor,
     })
 
 
@@ -208,97 +292,12 @@ def get_extractor(file_extension: str, url: str = None) -> BaseExtractor:
         if key in _FACTORY_REGISTRY:
             try:
                 return _FACTORY_REGISTRY[key]()
-            except Exception:
+            except Exception as e:
+                logging.warning(f"Factory function failed for {key}, falling back to direct instantiation: {e}")
                 pass  # Fall back to direct instantiation
         
         # Direct instantiation
         return extractor_class()
-    
-    # Fallback to hardcoded map (for backward compatibility)
-    extractor_map = {
-        # Document formats
-        '.pdf': PDFExtractor,
-        '.txt': TXTExtractor,
-        '.text': TXTExtractor,
-        '.rtf': TXTExtractor,
-        '.log': TXTExtractor,
-        
-        # Office documents
-        '.docx': DOCXExtractor,
-        '.doc': DOCXExtractor,
-        '.pptx': PPTXExtractor,
-        '.ppt': PPTXExtractor,
-        '.xlsx': XLSXExtractor,
-        '.xls': XLSXExtractor,
-        '.xlsm': XLSXExtractor,
-        '.xltx': XLSXExtractor,
-        '.xltm': XLSXExtractor,
-        '.xlt': XLSXExtractor,
-        
-        # Web formats
-        '.html': HTMLExtractor,
-        '.htm': HTMLExtractor,
-        '.xhtml': HTMLExtractor,
-        '.shtml': HTMLExtractor,
-        '.php': HTMLExtractor,
-        '.asp': HTMLExtractor,
-        '.jsp': HTMLExtractor,
-        
-        # Ebook formats
-        '.epub': EPUBExtractor,
-        '.epub3': EPUBExtractor,
-        
-        # Data formats
-        '.csv': CSVExtractor,
-        '.tsv': CSVExtractor,
-        '.json': JSONExtractor,
-        '.jsonld': JSONExtractor,
-        '.geojson': JSONExtractor,
-        '.topojson': JSONExtractor,
-        '.jsonl': JSONExtractor,
-        
-        # Markup formats
-        '.md': MarkdownExtractor,
-        '.markdown': MarkdownExtractor,
-        '.mdown': MarkdownExtractor,
-        '.mkd': MarkdownExtractor,
-        '.mkdn': MarkdownExtractor,
-        '.mdwn': MarkdownExtractor,
-        '.mdt': MarkdownExtractor,
-        '.mdtext': MarkdownExtractor,
-        '.rst': TXTExtractor,
-        
-        # Image formats
-        '.jpg': ImageExtractor,
-        '.jpeg': ImageExtractor,
-        '.png': ImageExtractor,
-        '.gif': ImageExtractor,
-        '.bmp': ImageExtractor,
-        '.tiff': ImageExtractor,
-        '.tif': ImageExtractor,
-        '.webp': ImageExtractor,
-        '.ico': ImageExtractor,
-        '.svg': ImageExtractor,
-        
-        # Configuration files
-        '.ini': TXTExtractor,
-        '.cfg': TXTExtractor,
-        '.conf': TXTExtractor,
-        '.yaml': TXTExtractor,
-        '.yml': TXTExtractor,
-        '.xml': TXTExtractor,
-    }
-    
-    extractor_class = extractor_map.get(file_extension)
-    if extractor_class:
-        return extractor_class()
-    
-    # Check for compressed files that might contain documents
-    if file_extension in ['.zip', '.rar', '.7z', '.tar', '.gz']:
-        raise ValueError(
-            f"Compressed files ({file_extension}) need to be extracted first. "
-            f"Supported formats: {get_registered_extensions()}"
-        )
     
     raise ValueError(
         f"No extractor found for file extension: {file_extension}. "
@@ -407,31 +406,6 @@ def validate_file_extension(file_extension: str) -> bool:
         return True
     except ValueError:
         return False
-
-
-# ====== SPECIALIZED FACTORY FUNCTIONS ======
-def create_pdf_extractor(
-    use_pdfplumber: bool = True, 
-    use_pypdf2: bool = True
-) -> PDFExtractor:
-    """Create a PDF extractor with custom settings."""
-    return PDFExtractor(use_pdfplumber=use_pdfplumber, use_pypdf2=use_pypdf2)
-
-
-def create_image_extractor(
-    use_ocr: bool = True, 
-    ocr_languages: Optional[List[str]] = None
-) -> ImageExtractor:
-    """Create an image extractor with custom settings."""
-    return ImageExtractor(use_ocr=use_ocr, ocr_languages=ocr_languages)
-
-
-def create_web_extractor(
-    timeout: int = 30, 
-    max_retries: int = 3
-) -> WebExtractor:
-    """Create a web extractor with custom settings."""
-    return WebExtractor(timeout=timeout, max_retries=max_retries)
 
 
 # ====== MODULE EXPORTS ======
