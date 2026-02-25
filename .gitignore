@@ -356,3 +356,10 @@ validation_results/
 
 # Specific validation files
 P1_1_4_git_validation_*.json
+
+
+__pycache__/
+*.pyc
+
+dev-cheatsheet.md
+dev-*.md
