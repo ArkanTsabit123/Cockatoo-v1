@@ -10,10 +10,6 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 import re
 
-# ============================================================================
-# APPLICATION INFORMATION
-# ============================================================================
-
 APP_NAME: str = "Cockatoo"
 APP_VERSION: str = "1.0.0"
 APP_DESCRIPTION: str = "AI-powered document intelligence system"
@@ -22,11 +18,7 @@ APP_LICENSE: str = "MIT"
 APP_WEBSITE: str = "https://github.com/cockatoo-v1"
 CONFIG_VERSION: str = "1.0.0"
 
-# ============================================================================
-# DIRECTORY AND FILE NAMES
-# ============================================================================
 
-# Directory names
 DEFAULT_CONFIG_DIR_NAME: str = "config"
 DEFAULT_DATA_DIR_NAME: str = "data"
 DEFAULT_MODELS_DIR_NAME: str = "models"
@@ -38,7 +30,7 @@ DEFAULT_CACHE_DIR_NAME: str = "cache"
 DEFAULT_TEMP_DIR_NAME: str = "temp"
 DEFAULT_BACKUP_DIR_NAME: str = "backups"
 
-# File names
+
 CONFIG_FILE_NAME: str = "config"
 CONFIG_FILE_EXTENSIONS: Dict[str, str] = {
     "yaml": ".yaml",
@@ -49,11 +41,7 @@ CONFIG_FILE_EXTENSIONS: Dict[str, str] = {
 SUPPORTED_CONFIG_FORMATS: List[str] = ["yaml", "yml", "json", "toml"]
 DEFAULT_CONFIG_FORMAT: str = "yaml"
 
-# ============================================================================
-# DOCUMENT PROCESSING CONSTANTS
-# ============================================================================
 
-# Chunking defaults and ranges
 DEFAULT_CHUNK_SIZE: int = 500
 DEFAULT_CHUNK_OVERLAP: int = 50
 MIN_CHUNK_SIZE: int = 100
@@ -65,7 +53,7 @@ RECOMMENDED_CHUNK_SIZE_MAX: int = 1000
 RECOMMENDED_CHUNK_OVERLAP_MIN: int = 10
 RECOMMENDED_CHUNK_OVERLAP_MAX: int = 200
 
-# File handling
+
 DEFAULT_MAX_FILE_SIZE_MB: int = 100
 MAX_FILE_SIZE_MB_MIN: int = 1
 MAX_FILE_SIZE_MB_MAX: int = 1024
@@ -73,29 +61,22 @@ DEFAULT_MAX_PAGES_PER_DOCUMENT: int = 1000
 MAX_PAGES_PER_DOCUMENT_MIN: int = 1
 MAX_PAGES_PER_DOCUMENT_MAX: int = 10000
 
-# Supported file formats
+
 DEFAULT_SUPPORTED_FORMATS: List[str] = [
     ".pdf", ".docx", ".txt", ".md", ".html", 
     ".epub", ".jpg", ".png", ".csv", ".pptx", ".xlsx"
 ]
 ALL_SUPPORTED_FORMATS: List[str] = [
-    # Documents
     ".pdf", ".docx", ".doc", ".odt", ".rtf", ".txt", ".md", ".rst",
-    # Web
     ".html", ".htm", ".xml", ".json", ".yaml", ".yml",
-    # E-books
     ".epub", ".mobi", ".azw3", ".fb2",
-    # Images
     ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp",
-    # Spreadsheets
     ".csv", ".xlsx", ".xls", ".ods",
-    # Presentations
     ".pptx", ".ppt", ".odp",
-    # Code
     ".py", ".js", ".java", ".cpp", ".c", ".h", ".rs", ".go",
 ]
 
-# OCR
+
 DEFAULT_OCR_ENABLED: bool = True
 DEFAULT_OCR_LANGUAGES: List[str] = ["eng", "ind"]
 SUPPORTED_OCR_LANGUAGES: List[str] = [
@@ -112,7 +93,7 @@ SUPPORTED_OCR_LANGUAGES: List[str] = [
     "tir", "tur", "uig", "ukr", "urd", "uzb", "uzb_cyrl", "vie", "yid",
 ]
 
-# Processing options
+
 DEFAULT_EXTRACT_TABLES: bool = True
 DEFAULT_EXTRACT_IMAGES: bool = True
 DEFAULT_PRESERVE_FORMATTING: bool = True
@@ -121,17 +102,13 @@ DEFAULT_MAX_PARALLEL_FILES: int = 4
 MAX_PARALLEL_FILES_MIN: int = 1
 MAX_PARALLEL_FILES_MAX: int = 16
 
-# ============================================================================
-# AI/ML CONSTANTS
-# ============================================================================
 
-# LLM Configuration
 DEFAULT_LLM_PROVIDER: str = "ollama"
 SUPPORTED_LLM_PROVIDERS: List[str] = ["ollama", "openai", "anthropic", "cohere", "huggingface", "llamacpp", "vllm"]
 DEFAULT_LLM_MODEL: str = "llama2:7b"
 DEFAULT_LLM_BASE_URL: str = "http://localhost:11434"
 
-# LLM Parameters
+
 DEFAULT_TEMPERATURE: float = 0.1
 DEFAULT_TOP_P: float = 0.9
 DEFAULT_TOP_K: int = 40
@@ -142,7 +119,7 @@ DEFAULT_MAX_RETRIES: int = 3
 DEFAULT_STREAM: bool = False
 DEFAULT_ECHO: bool = False
 
-# Ranges
+
 TEMPERATURE_MIN: float = 0.0
 TEMPERATURE_MAX: float = 2.0
 TOP_P_MIN: float = 0.0
@@ -154,7 +131,7 @@ MAX_TOKENS_MAX: int = 32768
 CONTEXT_WINDOW_MIN: int = 512
 CONTEXT_WINDOW_MAX: int = 131072
 
-# Embedding Configuration
+
 DEFAULT_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 SUPPORTED_EMBEDDING_MODELS: List[str] = [
     "all-MiniLM-L6-v2", "all-mpnet-base-v2", "multi-qa-mpnet-base-dot-v1",
@@ -170,7 +147,7 @@ DEFAULT_EMBEDDING_CACHE_SIZE_MB: int = 500
 DEFAULT_EMBEDDING_BATCH_SIZE: int = 32
 DEFAULT_NORMALIZE_EMBEDDINGS: bool = True
 
-# RAG Configuration
+
 DEFAULT_RAG_TOP_K: int = 5
 DEFAULT_SIMILARITY_THRESHOLD: float = 0.7
 DEFAULT_MAX_CONTEXT_LENGTH: int = 3000
@@ -181,7 +158,7 @@ DEFAULT_RERANKER_MODEL: Optional[str] = None
 DEFAULT_CHUNK_SEPARATOR: str = "\n\n"
 DEFAULT_PRESERVE_METADATA: bool = True
 
-# Ranges
+
 RAG_TOP_K_MIN: int = 1
 RAG_TOP_K_MAX: int = 50
 SIMILARITY_THRESHOLD_MIN: float = 0.0
@@ -191,47 +168,40 @@ MAX_CONTEXT_LENGTH_MAX: int = 10000
 BM25_WEIGHT_MIN: float = 0.0
 BM25_WEIGHT_MAX: float = 1.0
 
-# ============================================================================
-# DATABASE CONSTANTS
-# ============================================================================
 
 SUPPORTED_DATABASES: List[str] = ["chroma", "qdrant", "pgvector", "sqlite"]
 DEFAULT_DATABASE_TYPE: str = "chroma"
 
-# Database connection defaults
+
 DEFAULT_DATABASE_HOST: Optional[str] = None
 DEFAULT_DATABASE_PORT: Optional[int] = None
 DEFAULT_DATABASE_NAME: Optional[str] = None
 
-# ChromaDB specific
+
 CHROMA_DEFAULT_PATH: str = "chroma"
 CHROMA_DEFAULT_COLLECTION: str = "documents"
 
-# Qdrant specific
+
 QDRANT_DEFAULT_PORT: int = 6333
 QDRANT_DEFAULT_GRPC_PORT: int = 6334
 QDRANT_DEFAULT_COLLECTION: str = "documents"
 
-# pgvector specific
+
 PGVECTOR_DEFAULT_PORT: int = 5432
 PGVECTOR_DEFAULT_TABLE: str = "embeddings"
 
-# SQLite specific
+
 SQLITE_DEFAULT_DB_FILE: str = "cockatoo.db"
 
-# ============================================================================
-# UI CONSTANTS
-# ============================================================================
 
-# Theme
 DEFAULT_UI_THEME: str = "dark"
 SUPPORTED_THEMES: List[str] = ["light", "dark", "auto", "system"]
 
-# Language
+
 DEFAULT_LANGUAGE: str = "en"
 SUPPORTED_LANGUAGES: List[str] = ["en", "id", "es", "fr", "de", "zh", "ja", "ko"]
 
-# Font
+
 DEFAULT_FONT_FAMILY: str = "Segoe UI, Inter, -apple-system, BlinkMacSystemFont, Roboto, sans-serif"
 DEFAULT_FONT_SIZE: int = 12
 FONT_SIZE_MIN: int = 8
@@ -242,43 +212,39 @@ DEFAULT_LINE_HEIGHT: float = 1.5
 LINE_HEIGHT_MIN: float = 1.0
 LINE_HEIGHT_MAX: float = 2.5
 
-# Animation
+
 DEFAULT_ENABLE_ANIMATIONS: bool = True
-DEFAULT_ANIMATION_DURATION: int = 200  # ms
+DEFAULT_ANIMATION_DURATION: int = 200
 ANIMATION_DURATION_MIN: int = 0
 ANIMATION_DURATION_MAX: int = 1000
 
-# Auto-save
+
 DEFAULT_AUTO_SAVE: bool = True
-DEFAULT_AUTO_SAVE_INTERVAL: int = 60  # seconds
+DEFAULT_AUTO_SAVE_INTERVAL: int = 60
 AUTO_SAVE_INTERVAL_MIN: int = 10
 AUTO_SAVE_INTERVAL_MAX: int = 3600
 
-# Tooltips
+
 DEFAULT_SHOW_TOOLTIPS: bool = True
-DEFAULT_TOOLTIP_DELAY: int = 500  # ms
+DEFAULT_TOOLTIP_DELAY: int = 500
 TOOLTIP_DELAY_MIN: int = 0
 TOOLTIP_DELAY_MAX: int = 5000
 
-# Recent files
+
 DEFAULT_MAX_RECENT_FILES: int = 10
 MAX_RECENT_FILES_MIN: int = 0
 MAX_RECENT_FILES_MAX: int = 50
 
-# Other UI
+
 DEFAULT_CONFIRM_BEFORE_EXIT: bool = True
 
-# ============================================================================
-# STORAGE CONSTANTS
-# ============================================================================
 
-# Document limits
 DEFAULT_MAX_DOCUMENTS: int = 10000
 MAX_DOCUMENTS_MIN: int = 0
 MAX_DOCUMENTS_MAX: int = 1000000
 DEFAULT_MAX_DOCUMENT_SIZE_MB: int = 50
 
-# Cleanup
+
 DEFAULT_AUTO_CLEANUP: bool = True
 DEFAULT_AUTO_CLEANUP_DAYS: int = 90
 AUTO_CLEANUP_DAYS_MIN: int = 1
@@ -287,7 +253,7 @@ DEFAULT_CLEANUP_INTERVAL_HOURS: int = 24
 CLEANUP_INTERVAL_HOURS_MIN: int = 1
 CLEANUP_INTERVAL_HOURS_MAX: int = 168
 
-# Backup
+
 DEFAULT_BACKUP_ENABLED: bool = True
 DEFAULT_BACKUP_INTERVAL_HOURS: int = 24
 BACKUP_INTERVAL_HOURS_MIN: int = 1
@@ -296,27 +262,23 @@ DEFAULT_MAX_BACKUPS: int = 10
 MAX_BACKUPS_MIN: int = 1
 MAX_BACKUPS_MAX: int = 100
 
-# Encryption
+
 DEFAULT_ENCRYPTION_ENABLED: bool = False
 DEFAULT_ENCRYPTION_KEY: Optional[str] = None
-ENCRYPTION_KEY_LENGTH: int = 32  # AES-256
+ENCRYPTION_KEY_LENGTH: int = 32
 
-# Compression
+
 DEFAULT_COMPRESSION_ENABLED: bool = True
 DEFAULT_COMPRESSION_LEVEL: int = 6
 COMPRESSION_LEVEL_MIN: int = 1
 COMPRESSION_LEVEL_MAX: int = 9
 
-# ============================================================================
-# PERFORMANCE CONSTANTS
-# ============================================================================
 
-# Workers
 DEFAULT_MAX_WORKERS: int = 4
 MAX_WORKERS_MIN: int = 1
 MAX_WORKERS_MAX: int = 32
 
-# Cache
+
 DEFAULT_CACHE_ENABLED: bool = True
 DEFAULT_CACHE_SIZE_MB: int = 500
 CACHE_SIZE_MB_MIN: int = 10
@@ -325,13 +287,13 @@ DEFAULT_CACHE_TTL_SECONDS: int = 3600
 CACHE_TTL_SECONDS_MIN: int = 60
 CACHE_TTL_SECONDS_MAX: int = 86400
 
-# Monitoring
+
 DEFAULT_ENABLE_MONITORING: bool = True
 DEFAULT_MONITOR_INTERVAL_SECONDS: int = 60
 MONITOR_INTERVAL_SECONDS_MIN: int = 10
 MONITOR_INTERVAL_SECONDS_MAX: int = 3600
 
-# Memory limits
+
 DEFAULT_MEMORY_LIMIT_MB: Optional[int] = None
 MEMORY_LIMIT_MB_MIN: int = 100
 MEMORY_LIMIT_MB_MAX: int = 32768
@@ -339,45 +301,37 @@ DEFAULT_GPU_MEMORY_LIMIT_MB: Optional[int] = None
 GPU_MEMORY_LIMIT_MB_MIN: int = 100
 GPU_MEMORY_LIMIT_MB_MAX: int = 32768
 
-# Loading
+
 DEFAULT_PRELOAD_MODELS: bool = False
 DEFAULT_LAZY_LOADING: bool = True
 
-# ============================================================================
-# PRIVACY CONSTANTS
-# ============================================================================
 
-# Telemetry
 DEFAULT_TELEMETRY_ENABLED: bool = False
 DEFAULT_CRASH_REPORTS_ENABLED: bool = False
 DEFAULT_USAGE_STATISTICS_ENABLED: bool = False
 
-# Updates
+
 DEFAULT_AUTO_UPDATE_CHECK: bool = False
 SUPPORTED_UPDATE_CHANNELS: List[str] = ["stable", "beta", "dev"]
 DEFAULT_UPDATE_CHANNEL: str = "stable"
 
-# Data collection
+
 DEFAULT_DATA_COLLECTION_CONSENT: bool = False
 DEFAULT_ANALYTICS_ID: Optional[str] = None
 
-# Logging privacy
+
 DEFAULT_LOG_SENSITIVE_DATA: bool = False
 DEFAULT_ANONYMIZE_LOGS: bool = True
 
-# ============================================================================
-# LOGGING CONSTANTS
-# ============================================================================
 
-# Log levels
 DEFAULT_LOG_LEVEL: str = "INFO"
 SUPPORTED_LOG_LEVELS: List[str] = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
-# Log format
+
 DEFAULT_LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DEFAULT_LOG_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
-# Log files
+
 DEFAULT_LOG_FILE_ENABLED: bool = True
 DEFAULT_CONSOLE_ENABLED: bool = True
 DEFAULT_MAX_LOG_SIZE_MB: int = 10
@@ -387,11 +341,7 @@ DEFAULT_MAX_LOG_FILES: int = 5
 MAX_LOG_FILES_MIN: int = 1
 MAX_LOG_FILES_MAX: int = 50
 
-# ============================================================================
-# VALIDATION CONSTANTS
-# ============================================================================
 
-# Numeric ranges for validation
 NUMERIC_RANGES: Dict[str, Tuple[float, float]] = {
     "chunk_size": (MIN_CHUNK_SIZE, MAX_CHUNK_SIZE),
     "chunk_overlap": (MIN_CHUNK_OVERLAP, MAX_CHUNK_OVERLAP),
@@ -430,16 +380,13 @@ NUMERIC_RANGES: Dict[str, Tuple[float, float]] = {
     "max_log_files": (MAX_LOG_FILES_MIN, MAX_LOG_FILES_MAX),
 }
 
-# Recommended ranges (with warnings)
+
 RECOMMENDED_RANGES: Dict[str, Tuple[float, float]] = {
     "chunk_size": (RECOMMENDED_CHUNK_SIZE_MIN, RECOMMENDED_CHUNK_SIZE_MAX),
     "chunk_overlap": (RECOMMENDED_CHUNK_OVERLAP_MIN, RECOMMENDED_CHUNK_OVERLAP_MAX),
     "font_size": (RECOMMENDED_FONT_SIZE_MIN, RECOMMENDED_FONT_SIZE_MAX),
 }
 
-# ============================================================================
-# ENVIRONMENT VARIABLES
-# ============================================================================
 
 ENV_VAR_PREFIX: str = "COCKATOO_"
 
@@ -462,12 +409,8 @@ ENV_VAR_MAPPING: Dict[str, str] = {
     f"{ENV_VAR_PREFIX}DATABASE_NAME": "database_name",
 }
 
-# ============================================================================
-# ERROR MESSAGES
-# ============================================================================
 
 ERROR_MESSAGES: Dict[str, str] = {
-    # General errors
     "config_not_found": "Configuration file not found: {path}",
     "config_permission_denied": "Permission denied accessing config file: {path}",
     "config_invalid_yaml": "Invalid YAML format in config file: {error}",
@@ -476,22 +419,16 @@ ERROR_MESSAGES: Dict[str, str] = {
     "config_validation_failed": "Configuration validation failed: {errors}",
     "config_key_not_found": "Configuration key not found: {key}",
     "config_version_mismatch": "Config version mismatch. Expected {expected}, got {actual}",
-    
-    # Path errors
     "path_not_found": "Path not found: {path}",
     "path_not_writable": "Path is not writable: {path}",
     "path_permission_denied": "Permission denied for path: {path}",
     "path_not_directory": "Path is not a directory: {path}",
     "path_not_file": "Path is not a file: {path}",
-    
-    # Document processing errors
     "unsupported_format": "Unsupported file format: {format}. Supported formats: {supported}",
     "file_too_large": "File size exceeds limit: {size} MB > {limit} MB",
     "ocr_failed": "OCR processing failed for file {file}: {error}",
     "extraction_failed": "Document extraction failed: {error}",
     "chunking_failed": "Document chunking failed: {error}",
-    
-    # AI errors
     "llm_connection_failed": "Failed to connect to LLM provider {provider}: {error}",
     "llm_request_failed": "LLM request failed: {error}",
     "llm_timeout": "LLM request timed out after {timeout} seconds",
@@ -499,21 +436,15 @@ ERROR_MESSAGES: Dict[str, str] = {
     "embedding_failed": "Embedding generation failed: {error}",
     "rag_retrieval_failed": "RAG retrieval failed: {error}",
     "database_connection_failed": "Database connection failed: {error}",
-    
-    # Storage errors
     "storage_write_failed": "Failed to write to storage: {error}",
     "storage_read_failed": "Failed to read from storage: {error}",
     "backup_failed": "Backup failed: {error}",
     "encryption_failed": "Encryption failed: {error}",
     "compression_failed": "Compression failed: {error}",
-    
-    # Performance errors
     "cache_write_failed": "Failed to write to cache: {error}",
     "cache_read_failed": "Failed to read from cache: {error}",
     "resource_limit_exceeded": "Resource limit exceeded: {resource} = {value} > {limit}",
     "memory_limit_exceeded": "Memory limit exceeded: {used} MB > {limit} MB",
-    
-    # Validation errors
     "value_out_of_range": "{field} value {value} out of range [{min}, {max}]",
     "value_out_of_recommended": "{field} value {value} outside recommended range [{min}, {max}]",
     "invalid_enum_value": "Invalid {field} value: {value}. Must be one of: {allowed}",
@@ -522,26 +453,16 @@ ERROR_MESSAGES: Dict[str, str] = {
     "chunk_overlap_too_large": "chunk_overlap ({overlap}) must be less than chunk_size ({size})",
     "encryption_key_required": "Encryption key is required when encryption is enabled",
     "database_config_required": "Database host and name required for external database",
-    
-    # Privacy errors
     "telemetry_consent_required": "Telemetry consent is required to enable telemetry",
     "data_collection_consent_required": "Data collection consent is required",
-    
-    # Logging errors
     "log_file_creation_failed": "Failed to create log file: {error}",
     "log_directory_not_writable": "Log directory is not writable: {path}",
-    
-    # App errors
     "app_initialization_failed": "Failed to initialize application: {error}",
     "app_runtime_error": "Application runtime error: {error}",
     "app_shutdown_failed": "Failed to shutdown application: {error}",
 }
 
-# ============================================================================
-# REGEX PATTERNS
-# ============================================================================
 
-# Validation patterns
 EMAIL_PATTERN: re.Pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 URL_PATTERN: re.Pattern = re.compile(r"^https?://[^\s/$.?#].[^\s]*$")
 FILE_EXTENSION_PATTERN: re.Pattern = re.compile(r"^\.[a-zA-Z0-9]+$")
@@ -549,9 +470,6 @@ LANGUAGE_CODE_PATTERN: re.Pattern = re.compile(r"^[a-z]{3}$")
 VERSION_PATTERN: re.Pattern = re.compile(r"^\d+\.\d+\.\d+$")
 PATH_PATTERN: re.Pattern = re.compile(r"^[^\0]+$")
 
-# ============================================================================
-# MIME TYPES
-# ============================================================================
 
 MIME_TYPES: Dict[str, str] = {
     ".pdf": "application/pdf",
@@ -576,9 +494,6 @@ MIME_TYPES: Dict[str, str] = {
     ".xml": "application/xml",
 }
 
-# ============================================================================
-# UNIT CONVERSIONS
-# ============================================================================
 
 BYTES_PER_MB: int = 1024 * 1024
 BYTES_PER_GB: int = 1024 * 1024 * 1024
