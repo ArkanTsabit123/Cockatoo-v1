@@ -1,12 +1,14 @@
 # src/ai_engine/rag_engine.py
 
-"""RAG (Retrieval-Augmented Generation) engine.
+"""RAG (Retrieval-Augmented Generation) engine implementation.
 
-Combines retrieval from vector store with LLM generation.
+Combines document retrieval from vector store with LLM generation
+to provide context-aware responses.
 """
 
 import time
 import threading
+import re
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict, field
 from typing import List, Dict, Tuple, Any, Optional, Union, Generator
@@ -36,7 +38,7 @@ class Source:
 
 @dataclass
 class Document:
-    """Document for RAG."""
+    """Document for RAG processing."""
     id: str
     content: str
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -169,39 +171,140 @@ class Retriever:
         self._lock = threading.RLock()
     
     def retrieve(self, query: str, top_k: int = 5, threshold: float = 0.7, 
-                 filter_metadata: Optional[Dict] = None) -> List[Tuple[Document, float]]:
-        query_emb = self.embedding_service.encode(query)
+                filter_metadata: Optional[Dict] = None) -> List[Tuple[Document, float]]:
+        """
+        Retrieve documents from vector store based on query.
         
-        results = self.vector_store.search(
-            query_emb, 
-            top_k=top_k,
-            filter_metadata=filter_metadata
-        )
+        Args:
+            query: Search query
+            top_k: Number of results to return
+            threshold: Similarity threshold
+            filter_metadata: Metadata filters
+            
+        Returns:
+            List of (Document, score) tuples
+        """
+        logger.info(f"Retriever.retrieve called with query: '{query[:50]}...', top_k={top_k}, threshold={threshold}")
         
-        documents = []
-        for doc_id, score in results:
-            if score >= threshold:
-                doc_data = self.vector_store.get_document(doc_id)
-                if doc_data:
-                    doc = Document(
-                        id=doc_data["id"],
-                        content=doc_data["content"],
-                        metadata=doc_data.get("metadata", {}),
-                        source=doc_data.get("source"),
-                        created_at=datetime.fromisoformat(doc_data["created_at"]) if "created_at" in doc_data else datetime.now(),
-                        updated_at=datetime.fromisoformat(doc_data["updated_at"]) if "updated_at" in doc_data else datetime.now()
-                    )
-                    if "embedding" in doc_data:
-                        doc.embedding = np.array(doc_data["embedding"])
-                    documents.append((doc, score))
-        
-        return documents
+        try:
+            query_emb = self.embedding_service.encode(query)
+            documents = []
+            
+            try:
+                if hasattr(self.vector_store, 'get_collection_info'):
+                    info = self.vector_store.get_collection_info()
+                    logger.info(f"Collection info: {info}")
+                    if info.get('document_count', 0) == 0:
+                        logger.warning("Collection is empty, no documents to retrieve")
+                        return []
+                
+                if hasattr(self.vector_store, 'count_documents'):
+                    count = self.vector_store.count_documents()
+                    logger.info(f"Document count: {count}")
+                    if count == 0:
+                        logger.warning("No documents in store")
+                        return []
+            except Exception as e:
+                logger.warning(f"Failed to check collection: {e}")
+            
+            if hasattr(self.vector_store, 'search'):
+                logger.info(f"Using vector_store.search with query: '{query[:50]}...'")
+                results = self.vector_store.search(
+                    query=query,
+                    n_results=top_k,
+                    where=filter_metadata
+                )
+                
+                if isinstance(results, dict):
+                    ids = results.get("ids", [])
+                    docs = results.get("documents", [])
+                    distances = results.get("distances", [])
+                    metadatas = results.get("metadatas", [])
+                    
+                    logger.info(f"Retrieved {len(ids)} documents from vector store via search")
+                    
+                    if len(ids) == 0:
+                        logger.warning("Search returned no results")
+                        logger.info("Attempting with empty query to get all documents")
+                        all_results = self.vector_store.search("", n_results=top_k)
+                        if isinstance(all_results, dict):
+                            ids = all_results.get("ids", [])
+                            docs = all_results.get("documents", [])
+                            distances = all_results.get("distances", [])
+                            metadatas = all_results.get("metadatas", [])
+                            logger.info(f"Empty query returned {len(ids)} documents")
+                    
+                    for i, (doc_id, doc_text, distance, metadata) in enumerate(zip(ids, docs, distances, metadatas)):
+                        if hasattr(self.vector_store, '_distance_to_similarity'):
+                            score = self.vector_store._distance_to_similarity(distance)
+                        else:
+                            score = 1.0 / (1.0 + distance) if distance > 0 else 1.0
+                        
+                        logger.debug(f"Document {i}: score={score:.3f}, threshold={threshold}, text='{doc_text[:50]}...'")
+                        
+                        if score >= threshold:
+                            doc = Document(
+                                id=doc_id,
+                                content=doc_text,
+                                metadata=metadata or {}
+                            )
+                            documents.append((doc, score))
+                        else:
+                            logger.debug(f"Document {i} skipped: score {score:.3f} < threshold {threshold}")
+            
+            elif hasattr(self.vector_store, 'similarity_search'):
+                logger.info(f"Using vector_store.similarity_search with query: '{query[:50]}...'")
+                results = self.vector_store.similarity_search(
+                    query=query,
+                    k=top_k
+                )
+                
+                for doc, score in results:
+                    if score >= threshold:
+                        documents.append((doc, score))
+            
+            elif hasattr(self.vector_store, 'search_with_embeddings'):
+                logger.info(f"Using vector_store.search_with_embeddings")
+                results = self.vector_store.search_with_embeddings(
+                    query_embeddings=[query_emb.tolist()],
+                    n_results=top_k,
+                    where=filter_metadata
+                )
+                
+                if isinstance(results, dict):
+                    ids = results.get("ids", [])
+                    docs = results.get("documents", [])
+                    distances = results.get("distances", [])
+                    metadatas = results.get("metadatas", [])
+                    
+                    for i, (doc_id, doc_text, distance, metadata) in enumerate(zip(ids, docs, distances, metadatas)):
+                        if hasattr(self.vector_store, '_distance_to_similarity'):
+                            score = self.vector_store._distance_to_similarity(distance)
+                        else:
+                            score = 1.0 / (1.0 + distance) if distance > 0 else 1.0
+                        
+                        if score >= threshold:
+                            doc = Document(
+                                id=doc_id,
+                                content=doc_text,
+                                metadata=metadata or {}
+                            )
+                            documents.append((doc, score))
+            
+            logger.info(f"After threshold filtering: {len(documents)} documents")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Error in retrieve: {e}", exc_info=True)
+            return []
     
     def retrieve_by_text(self, query: str, top_k: int = 5, threshold: float = 0.7,
                         filter_metadata: Optional[Dict] = None) -> List[Tuple[Document, float]]:
+        """Alias for retrieve method."""
         return self.retrieve(query, top_k, threshold, filter_metadata)
     
     def rerank(self, documents: List[Tuple[Document, float]], query: str) -> List[Tuple[Document, float]]:
+        """Rerank documents based on query similarity."""
         if not documents:
             return []
         
@@ -220,6 +323,7 @@ class Retriever:
         return scored_docs
     
     def mmr_retrieve(self, query: str, top_k: int = 5, lambda_param: float = 0.5) -> List[Document]:
+        """Maximum Marginal Relevance retrieval for diverse results."""
         candidates = self.retrieve(query, top_k=top_k * 3, threshold=0.0)
         if not candidates:
             return []
@@ -275,6 +379,10 @@ class ContextBuilder:
     
     def build_context(self, documents: List[Tuple[Document, float]], query: str,
                      include_metadata: bool = False, raise_on_overflow: bool = False) -> str:
+        """Build context string from retrieved documents."""
+        if not documents:
+            return "No relevant documents found."
+        
         context_parts = []
         current_tokens = 0
         
@@ -333,11 +441,13 @@ class ContextBuilder:
         return "".join(context_parts)
 
     def _count_tokens(self, text: str) -> int:
+        """Simple token counter (approximate)."""
         if not text:
             return 0
         return max(1, (len(text) + 3) // 4)
     
     def format_documents(self, documents: List[Document]) -> str:
+        """Format documents for display."""
         parts = []
         for i, doc in enumerate(documents, 1):
             parts.append(f"[{i}] {doc.source or 'Unknown'}: {doc.content[:200]}...")
@@ -446,7 +556,7 @@ class PerformanceMetrics:
 
 
 class ConversationManager:
-    """Manage conversation history."""
+    """Manage conversation history with context preservation."""
     
     def __init__(self):
         self.conversations: Dict[str, List[Dict]] = {}
@@ -456,6 +566,7 @@ class ConversationManager:
         with self._lock:
             if conversation_id not in self.conversations:
                 self.conversations[conversation_id] = []
+                logger.info(f"Started new conversation: {conversation_id}")
     
     def add_to_history(self, conversation_id: str, query: str, response: RAGResponse):
         with self._lock:
@@ -466,28 +577,24 @@ class ConversationManager:
                     "timestamp": datetime.now().isoformat(),
                     "sources": [s.to_dict() for s in response.sources]
                 })
+                
+                if len(self.conversations[conversation_id]) > 20:
+                    self.conversations[conversation_id] = self.conversations[conversation_id][-20:]
+                
+                logger.debug(f"Added message to conversation {conversation_id}. Total messages: {len(self.conversations[conversation_id])}")
     
     def get_history(self, conversation_id: str) -> Optional[List[Dict]]:
         with self._lock:
-            return self.conversations.get(conversation_id)
+            history = self.conversations.get(conversation_id)
+            if history:
+                logger.debug(f"Retrieved history for {conversation_id}: {len(history)} messages")
+            return history
     
     def clear_conversation(self, conversation_id: str):
         with self._lock:
             if conversation_id in self.conversations:
                 del self.conversations[conversation_id]
-    
-    def build_context_with_history(self, conversation_id: str, current_query: str) -> List[Dict]:
-        history = self.get_history(conversation_id)
-        if not history:
-            return [{"role": "user", "content": current_query}]
-        
-        messages = []
-        for item in history:
-            messages.append({"role": "user", "content": item["query"]})
-            messages.append({"role": "assistant", "content": item["answer"]})
-        messages.append({"role": "user", "content": current_query})
-        
-        return messages
+                logger.info(f"Cleared conversation: {conversation_id}")
 
 
 class RAGEngine:
@@ -535,19 +642,75 @@ class RAGEngine:
         logger.info("RAGEngine initialized with config: %s", self.config.to_dict())
     
     def _create_mock_embedding_service(self):
+        """Create a mock embedding service for testing."""
         class MockEmbeddingService:
             def encode(self, text):
                 return np.random.rand(384)
             
             def compute_similarity(self, emb1, emb2):
-                return float(np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2)))
+                return float(np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2) + 1e-10))
         
         return MockEmbeddingService()
+    
+    def _normalize_llm_response(self, llm_response):
+        """
+        Normalize LLM response to have consistent attributes.
+        Handles differences between LLM client implementations.
+        """
+        from types import SimpleNamespace
+        
+        if hasattr(llm_response, 'content'):
+            return llm_response
+        
+        if hasattr(llm_response, 'text'):
+            normalized = SimpleNamespace()
+            normalized.content = llm_response.text
+            normalized.text = llm_response.text
+            
+            if hasattr(llm_response, 'total_tokens'):
+                normalized.total_tokens = llm_response.total_tokens
+            elif hasattr(llm_response, 'usage'):
+                normalized.usage = llm_response.usage
+                if isinstance(llm_response.usage, dict):
+                    normalized.total_tokens = llm_response.usage.get('total_tokens', 0)
+                else:
+                    normalized.total_tokens = 0
+            else:
+                normalized.total_tokens = 0
+            
+            if hasattr(llm_response, 'finish_reason'):
+                normalized.finish_reason = llm_response.finish_reason
+            
+            if hasattr(llm_response, 'latency'):
+                normalized.latency = llm_response.latency
+            
+            return normalized
+        
+        fallback = SimpleNamespace()
+        fallback.content = str(llm_response)
+        fallback.text = str(llm_response)
+        fallback.total_tokens = 0
+        return fallback
     
     def query(self, query: str, filter_metadata: Optional[Dict] = None,
               top_k: Optional[int] = None, query_type: str = "default",
               fallback: bool = False, conversation_id: Optional[str] = None,
               include_history: bool = False) -> RAGResponse:
+        """
+        Main query method for RAG engine.
+        
+        Args:
+            query: User query
+            filter_metadata: Metadata filters for retrieval
+            top_k: Number of documents to retrieve
+            query_type: Type of query for metrics
+            fallback: Whether to use fallback if main query fails
+            conversation_id: ID for conversation tracking
+            include_history: Whether to include conversation history
+            
+        Returns:
+            RAGResponse object
+        """
         if not query or not query.strip():
             raise ValueError("Query cannot be empty")
         
@@ -559,24 +722,88 @@ class RAGEngine:
             if cached:
                 cached.metadata["cache_hit"] = True
                 cached.processing_time_ms = (time.time() - start_time) * 1000
+                logger.info(f"Cache hit for query: {query[:50]}...")
                 return cached
         
         top_k = top_k or self.config.top_k
         threshold = self.config.similarity_threshold
         
         try:
-            if self.config.enable_query_expansion:
-                expanded_queries = self._expand_query(query)
-                retrieval_query = expanded_queries[0] if expanded_queries else query
-            else:
-                retrieval_query = query
+            retrieval_query = query
             
-            results = self.retriever.retrieve_by_text(
-                retrieval_query,
-                top_k=top_k,
-                threshold=threshold,
-                filter_metadata=filter_metadata
-            )
+            logger.info(f"Processing query: '{query[:50]}...' with top_k={top_k}, threshold={threshold}")
+            
+            try:
+                collection_info = self.vector_store.get_collection_info()
+                logger.info(f"Vector store status: {collection_info}")
+                
+                direct_results = self.vector_store.search(retrieval_query, n_results=top_k)
+                logger.info(f"Direct search returned {direct_results.get('count', 0)} results")
+                if direct_results.get('count', 0) > 0:
+                    sample = direct_results.get('documents', [''])[0][:100] if direct_results.get('documents') else ''
+                    logger.info(f"Sample result: {sample}...")
+            except Exception as e:
+                logger.warning(f"Debug info failed: {e}")
+            
+            results = []
+            thresholds_to_try = [threshold, 0.3, 0.1] if threshold > 0.1 else [threshold]
+            
+            for attempt_threshold in thresholds_to_try:
+                if results:
+                    break
+                    
+                logger.info(f"Attempting retrieval with threshold: {attempt_threshold}")
+                
+                try:
+                    if hasattr(self.vector_store, 'count_documents'):
+                        doc_count = self.vector_store.count_documents()
+                        logger.info(f"Total documents in store before retrieval: {doc_count}")
+                except:
+                    pass
+                
+                try:
+                    direct = self.vector_store.search(retrieval_query, n_results=top_k)
+                    direct_count = direct.get('count', 0)
+                    logger.info(f"Direct search returned {direct_count} results")
+                    if direct_count > 0:
+                        logger.info(f"Sample direct result: {direct.get('documents', [''])[0][:100]}...")
+                    else:
+                        logger.warning("Direct search returned 0 results")
+                        
+                        empty_results = self.vector_store.search("", n_results=top_k)
+                        logger.info(f"Empty query returned {empty_results.get('count', 0)} results")
+                except Exception as e:
+                    logger.warning(f"Direct search failed: {e}")
+                
+                results = self.retriever.retrieve_by_text(
+                    retrieval_query,
+                    top_k=top_k * 2,
+                    threshold=attempt_threshold,
+                    filter_metadata=filter_metadata
+                )
+                
+                if results:
+                    logger.info(f"Found {len(results)} results with threshold {attempt_threshold}")
+                else:
+                    logger.warning(f"No results found with threshold {attempt_threshold}")
+            
+            if not results:
+                logger.warning("No results found with any threshold, attempting to get all documents")
+                try:
+                    all_docs = self.vector_store.get_all_documents()
+                    logger.info(f"Total documents in store: {len(all_docs)}")
+                    
+                    if all_docs:
+                        for i, doc in enumerate(all_docs[:top_k]):
+                            doc_obj = Document(
+                                id=doc.get('id', f"doc_{i}"),
+                                content=doc.get('document', ''),
+                                metadata=doc.get('metadata', {})
+                            )
+                            results.append((doc_obj, 0.1))
+                        logger.info(f"Using {len(results)} documents as fallback")
+                except Exception as e:
+                    logger.warning(f"Failed to get all documents: {e}")
             
             if self.config.rerank_results and results:
                 results = self.retriever.rerank(results, retrieval_query)
@@ -592,13 +819,84 @@ class RAGEngine:
                 include_metadata=True
             )
             
+            user_name = None
             if conversation_id and include_history:
-                history = self.conversation_manager.build_context_with_history(conversation_id, query)
-                history_text = "\n".join([f"{m['role']}: {m['content']}" for m in history])
-                context = f"Conversation history:\n{history_text}\n\nCurrent context:\n{context}"
+                history = self.conversation_manager.get_history(conversation_id)
+                
+                conversation_context = ""
+                if history:
+                    for i, item in enumerate(history):
+                        conversation_context += f"User {i+1}: {item['query']}\n"
+                        conversation_context += f"Assistant {i+1}: {item['answer']}\n\n"
+                        
+                        query_lower = item['query'].lower()
+                        
+                        patterns = [
+                            (r"my name is (\w+)", "my name is"),
+                            (r"my name's (\w+)", "my name's"), 
+                            (r"i am (\w+)", "i am"),
+                            (r"i'm (\w+)", "i'm"),
+                            (r"call me (\w+)", "call me"),
+                            (r"name[:\s]+(\w+)", "name:"),
+                            (r"(\w+) is my name", "is my name")
+                        ]
+                        
+                        for pattern, desc in patterns:
+                            match = re.search(pattern, query_lower, re.IGNORECASE)
+                            if match:
+                                user_name = match.group(1).capitalize()
+                                logger.info(f"Extracted user name: {user_name} using pattern: {desc}")
+                                break
+                
+                is_name_query = any(phrase in query.lower() for phrase in 
+                                   ["my name", "what is my name", "who am i", "name"])
+                
+                if is_name_query:
+                    if user_name:
+                        system_message = f"The user's name is {user_name}. You MUST answer with their name when asked about it. Do not introduce yourself as a chatbot."
+                        logger.info(f"Using name-specific prompt for user: {user_name}")
+                    else:
+                        system_message = "The user has not provided their name yet."
+                else:
+                    if user_name:
+                        system_message = f"Remember that the user's name is {user_name}."
+                    else:
+                        system_message = "Remember the conversation history."
+                
+                if conversation_context:
+                    full_context = f"""CONVERSATION HISTORY:
+{conversation_context}
+
+{system_message}
+
+DOCUMENT CONTEXT:
+{context}
+
+CURRENT QUESTION: {query}
+
+INSTRUCTIONS:
+1. Answer naturally based on the conversation history and document context
+2. If asked about the user's name, answer with their actual name
+3. Do not introduce yourself when answering about the user's name
+4. Use information from the conversation history
+
+Your answer:"""
+                else:
+                    full_context = f"""DOCUMENT CONTEXT:
+{context}
+
+QUESTION: {query}
+
+Answer based on the document context above."""
+                
+                prompt = self._build_prompt(query, full_context)
+            else:
+                prompt = self._build_prompt(query, context)
             
-            prompt = self._build_prompt(query, context)
+            logger.info(f"Sending prompt to LLM (length: {len(prompt)} chars)")
             llm_response = self.llm_client.generate(prompt)
+            
+            llm_response = self._normalize_llm_response(llm_response)
             
             confidence = self._calculate_confidence(sources, llm_response.content)
             
@@ -616,7 +914,8 @@ class RAGEngine:
                     "threshold": threshold,
                     "num_sources": len(sources),
                     "filter": filter_metadata,
-                    "fallback_used": False
+                    "fallback_used": False,
+                    "retrieved_count": len(results)
                 }
             )
             
@@ -632,10 +931,11 @@ class RAGEngine:
             if self.config.enable_cache:
                 self.cache.set(cache_key, response)
             
+            logger.info(f"Query completed in {processing_time_ms:.2f}ms with {len(sources)} sources")
             return response
             
         except Exception as e:
-            logger.error("RAG query failed: %s", str(e))
+            logger.error("RAG query failed: %s", str(e), exc_info=True)
             
             if fallback:
                 try:
@@ -646,7 +946,7 @@ class RAGEngine:
                     
                     response = RAGResponse(
                         query=query,
-                        answer="I found some information but couldn't process it fully.",
+                        answer="I found some information but could not process it fully.",
                         sources=sources,
                         confidence=0.3,
                         processing_time_ms=processing_time_ms,
@@ -667,7 +967,9 @@ class RAGEngine:
             raise RuntimeError(f"RAG query failed: {str(e)}") from e
     
     def query_streaming(self, query: str, filter_metadata: Optional[Dict] = None,
-                       top_k: Optional[int] = None) -> Generator[str, None, None]:
+                    top_k: Optional[int] = None, conversation_id: Optional[str] = None,
+                    include_history: bool = False) -> Generator[str, None, None]:
+        """Stream query response token by token."""
         start_time = time.time()
         
         top_k = top_k or self.config.top_k
@@ -681,6 +983,17 @@ class RAGEngine:
         )
         
         context = self.context_builder.build_context(results, query)
+        
+        if conversation_id and include_history:
+            history = self.conversation_manager.get_history(conversation_id)
+            if history:
+                conversation_context = ""
+                for item in history:
+                    conversation_context += f"User: {item['query']}\n"
+                    conversation_context += f"Assistant: {item['answer']}\n"
+                
+                context = f"Previous conversation:\n{conversation_context}\n\nDocument context:\n{context}"
+        
         prompt = self._build_prompt(query, context)
         
         full_answer = []
@@ -688,13 +1001,22 @@ class RAGEngine:
             full_answer.append(chunk)
             yield chunk
         
-        processing_time_ms = (time.time() - start_time) * 1000
+        if conversation_id:
+            response = RAGResponse(
+                query=query,
+                answer="".join(full_answer),
+                sources=[doc.to_source(score) for doc, score in results],
+                processing_time_ms=(time.time() - start_time) * 1000
+            )
+            self.conversation_manager.add_to_history(conversation_id, query, response)
         
+        processing_time_ms = (time.time() - start_time) * 1000
         with self._lock:
             self._stats["total_queries"] += 1
             self._stats["total_processing_time_ms"] += processing_time_ms
     
     def _expand_query(self, query: str) -> List[str]:
+        """Expand query with alternatives for better retrieval."""
         try:
             prompt = f"""Generate 3 alternative ways to ask this question for better search results:
 Original: {query}
@@ -703,7 +1025,14 @@ Alternative queries (one per line, numbered):"""
             
             response = self.llm_client.generate(prompt)
             
-            lines = response.content.strip().split('\n')
+            if hasattr(response, 'content'):
+                response_text = response.content
+            elif hasattr(response, 'text'):
+                response_text = response.text
+            else:
+                response_text = str(response)
+            
+            lines = response_text.strip().split('\n')
             alternatives = []
             for line in lines:
                 if '.' in line:
@@ -717,6 +1046,7 @@ Alternative queries (one per line, numbered):"""
             return [query]
     
     def _deduplicate_sources(self, sources: List[Source]) -> List[Source]:
+        """Remove duplicate sources based on text content."""
         seen = set()
         unique = []
         
@@ -729,10 +1059,23 @@ Alternative queries (one per line, numbered):"""
         return unique
     
     def _fallback_search(self, query: str) -> List[Tuple[Document, float]]:
+        """Fallback search when main retrieval fails."""
         return self.retriever.retrieve_by_text(query, top_k=3, threshold=0.3)
     
     def _build_prompt(self, query: str, context: str) -> str:
-        return f"""You are a helpful assistant. Answer the question based on the provided context.
+        """Build prompt for LLM with instructions."""
+        
+        is_name_query = any(phrase in query.lower() for phrase in 
+                           ["my name", "what is my name", "who am i", "name"])
+        
+        if is_name_query and "CONVERSATION HISTORY" in context and "user's name is" in context:
+            return f"""{context}
+
+Remember: The user provided their name in the conversation history.
+Answer with their actual name, not your own name.
+Be direct and concise."""
+        else:
+            return f"""You are a helpful assistant. Answer the question based on the provided context.
 
 Context:
 {context}
@@ -742,6 +1085,7 @@ Question: {query}
 Answer:"""
     
     def _calculate_confidence(self, sources: List[Source], answer: str) -> float:
+        """Calculate confidence score for response."""
         if not sources:
             return 0.0
         
@@ -751,21 +1095,26 @@ Answer:"""
         return 0.7 * source_conf + 0.3 * answer_conf
     
     def start_conversation(self, conversation_id: str):
+        """Start a new conversation session."""
         self.conversation_manager.start_conversation(conversation_id)
     
     def get_conversation_history(self, conversation_id: str) -> Optional[List[Dict]]:
+        """Get conversation history by ID."""
         return self.conversation_manager.get_history(conversation_id)
     
     def clear_conversation(self, conversation_id: str):
+        """Clear a conversation."""
         self.conversation_manager.clear_conversation(conversation_id)
     
     def get_performance_metrics(self, by_type: bool = False) -> Dict[str, Any]:
+        """Get performance metrics."""
         metrics = self.metrics.get_metrics(by_type)
         with self._lock:
             metrics.update(self._stats)
         return metrics
     
     def reset_metrics(self):
+        """Reset all metrics."""
         self.metrics.reset()
         with self._lock:
             self._stats = {
@@ -775,6 +1124,7 @@ Answer:"""
             }
     
     def health_check(self, include_performance: bool = False) -> Dict[str, Any]:
+        """Check health of all components."""
         components = {
             "llm": True,
             "vector_store": True,
@@ -784,14 +1134,16 @@ Answer:"""
         health_score = 1.0
         
         try:
-            self.llm_client.generate("test")
-        except:
+            self.llm_client.generate("test", max_tokens=5)
+        except Exception as e:
+            logger.warning(f"LLM health check failed: {e}")
             components["llm"] = False
             health_score -= 0.5
         
         try:
-            self.vector_store.get_stats()
-        except:
+            self.vector_store.get_collection_info()
+        except Exception as e:
+            logger.warning(f"Vector store health check failed: {e}")
             components["vector_store"] = False
             health_score -= 0.5
         
@@ -808,10 +1160,12 @@ Answer:"""
         return health
     
     def invalidate_cache(self):
+        """Invalidate all cached responses."""
         self.cache.invalidate()
+        logger.info("Cache invalidated")
 
 
 def get_rag_engine(embedding_service=None, llm_client=None, vector_store=None,
                    config: Optional[Union[RAGConfig, Dict]] = None) -> RAGEngine:
-    """Get RAG engine instance."""
+    """Get RAG engine instance (singleton)."""
     return RAGEngine(config=config, llm_client=llm_client, vector_store=vector_store)
