@@ -1,27 +1,17 @@
-# cockatoo_v1/src/document_processing/metadata.py
+# src/document_processing/metadata.py
 
-"""
-metadata.py
-Metadata Extraction and Management for Cockatoo_V1 Document Processing Pipeline.
-
-This module provides comprehensive metadata extraction from various document formats,
-including automatic detection of titles, authors, dates, and other metadata fields.
-
-Author: Cockatoo_V1 Development Team
-Version: 1.0.0
-"""
+"""Metadata extraction and management for document processing pipeline."""
 
 import os
 import re
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Union, Tuple
+from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass, asdict, field
 import logging
 from enum import Enum
 
-# Third-party imports for specialized metadata extraction
 try:
     import pdfplumber
     HAS_PDFPLUMBER = True
@@ -60,13 +50,14 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 class DocumentType(Enum):
     """Supported document types for metadata extraction."""
     PDF = "pdf"
     DOCX = "docx"
     TXT = "txt"
     EPUB = "epub"
-    MD = "md"  # Markdown
+    MD = "md"
     HTML = "html"
     JSON = "json"
     YAML = "yaml"
@@ -76,62 +67,51 @@ class DocumentType(Enum):
     IMAGE = "image"
     UNKNOWN = "unknown"
 
+
 @dataclass
 class DocumentMetadata:
-    """
-    Comprehensive metadata structure for documents.
-    Based on database schema from blueprint.
-    """
-    # Core file metadata
-    file_path: str
-    file_name: str
-    file_type: str
-    file_size: int
-    upload_date: Optional[datetime] = None
+    """Comprehensive metadata structure for documents."""
+    core_file_path: str
+    core_file_name: str
+    core_file_type: str
+    core_file_size: int
+    core_upload_date: Optional[datetime] = None
     
-    # Content metadata
-    title: Optional[str] = None
-    author: Optional[str] = None
-    date: Optional[datetime] = None
-    publisher: Optional[str] = None
-    language: Optional[str] = None
-    abstract: Optional[str] = None
-    keywords: List[str] = field(default_factory=list)
-    categories: List[str] = field(default_factory=list)
+    content_title: Optional[str] = None
+    content_author: Optional[str] = None
+    content_date: Optional[datetime] = None
+    content_publisher: Optional[str] = None
+    content_language: Optional[str] = None
+    content_abstract: Optional[str] = None
+    content_keywords: str = ""
+    content_categories: str = ""
     
-    # Processing metadata
     processing_status: str = "pending"
     processing_error: Optional[str] = None
-    chunk_count: int = 0
-    word_count: int = 0
-    page_count: Optional[int] = None
+    processing_chunk_count: int = 0
+    processing_word_count: int = 0
+    processing_page_count: Optional[int] = None
     
-    # Technical metadata
-    encoding: Optional[str] = None
-    created_date: Optional[datetime] = None
-    modified_date: Optional[datetime] = None
-    software: Optional[str] = None
-    version: Optional[str] = None
+    technical_encoding: Optional[str] = None
+    technical_created_date: Optional[datetime] = None
+    technical_modified_date: Optional[datetime] = None
+    technical_software: Optional[str] = None
+    technical_version: Optional[str] = None
     
-    # Custom metadata
     custom_fields: Dict[str, Any] = field(default_factory=dict)
     
-    # Internal tracking
-    is_indexed: bool = False
-    indexed_at: Optional[datetime] = None
-    last_accessed: Optional[datetime] = None
-    access_count: int = 0
+    tracking_is_indexed: bool = False
+    tracking_indexed_at: Optional[datetime] = None
+    tracking_last_accessed: Optional[datetime] = None
+    tracking_access_count: int = 0
     
     def __post_init__(self):
-        """Initialize optional fields."""
-        if self.upload_date is None:
-            self.upload_date = datetime.now()
+        if self.core_upload_date is None:
+            self.core_upload_date = datetime.now()
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert metadata to dictionary for serialization."""
         result = asdict(self)
         
-        # Convert datetime objects to ISO format strings
         for key, value in result.items():
             if isinstance(value, datetime):
                 result[key] = value.isoformat()
@@ -139,14 +119,12 @@ class DocumentMetadata:
         return result
     
     def to_json(self) -> str:
-        """Convert metadata to JSON string."""
         return json.dumps(self.to_dict(), indent=2, ensure_ascii=False)
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DocumentMetadata':
-        """Create metadata from dictionary."""
-        # Convert ISO strings back to datetime
-        datetime_fields = ['upload_date', 'date', 'created_date', 'modified_date', 'indexed_at', 'last_accessed']
+        datetime_fields = ['core_upload_date', 'content_date', 'technical_created_date', 
+                          'technical_modified_date', 'tracking_indexed_at', 'tracking_last_accessed']
         
         for field in datetime_fields:
             if field in data and data[field] and isinstance(data[field], str):
@@ -157,41 +135,32 @@ class DocumentMetadata:
         
         return cls(**data)
 
+
 class MetadataExtractor:
-    """
-    Main class for extracting metadata from various document formats.
-    Uses format-specific extractors with fallback strategies.
-    """
+    """Main class for extracting metadata from various document formats."""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize metadata extractor with configuration.
-        
-        Args:
-            config: Optional configuration dictionary.
-        """
         self.config = config or {}
         self.extractors = self._initialize_extractors()
         
-        # Common patterns for metadata extraction
         self.patterns = {
             'title': [
-                r'^#{1,3}\s+(.+)$',  # Markdown headers
-                r'<title>(.+?)</title>',  # HTML title
-                r'^(?:[A-Z][A-Z\s]{10,})$',  # ALL CAPS titles
-                r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}$',  # Title case lines
+                r'^#{1,3}\s+(.+)$',
+                r'<title>(.+?)</title>',
+                r'^(?:[A-Z][A-Z\s]{10,})$',
+                r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}$',
             ],
             'author': [
-                r'by\s+([A-Z][a-z]+\s+[A-Z][a-z]+)',  # "by John Doe"
-                r'author[:\s]+([^\n]+)',  # "Author: John Doe"
-                r'©\s*\d{4}\s+([^\n]+)',  # Copyright notice
-                r'written by\s+([^\n]+)',  # "Written by John Doe"
+                r'by\s+([A-Z][a-z]+\s+[A-Z][a-z]+)',
+                r'author[:\s]+([^\n]+)',
+                r'©\s*\d{4}\s+([^\n]+)',
+                r'written by\s+([^\n]+)',
             ],
             'date': [
-                r'\b\d{4}-\d{2}-\d{2}\b',  # YYYY-MM-DD
-                r'\b\d{2}/\d{2}/\d{4}\b',  # MM/DD/YYYY
-                r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b',  # Month Day, Year
-                r'\b\d{4}\b',  # Just year
+                r'\b\d{4}-\d{2}-\d{2}\b',
+                r'\b\d{2}/\d{2}/\d{4}\b',
+                r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b',
+                r'\b\d{4}\b',
             ],
             'email': [
                 r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
@@ -207,17 +176,15 @@ class MetadataExtractor:
             ]
         }
         
-        # Language detection patterns
         self.language_patterns = {
-            'en': [r'\bthe\b', r'\band\b', r'\bof\b'],  # English common words
-            'id': [r'\bdan\b', r'\byang\b', r'\bdi\b'],  # Indonesian
-            'es': [r'\bel\b', r'\bla\b', r'\by\b'],  # Spanish
-            'fr': [r'\ble\b', r'\bla\b', r'\bet\b'],  # French
-            'de': [r'\bder\b', r'\bdie\b', r'\bden\b'],  # German
+            'en': [r'\bthe\b', r'\band\b', r'\bof\b'],
+            'id': [r'\bdan\b', r'\byang\b', r'\bdi\b'],
+            'es': [r'\bel\b', r'\bla\b', r'\by\b'],
+            'fr': [r'\ble\b', r'\bla\b', r'\bet\b'],
+            'de': [r'\bder\b', r'\bdie\b', r'\bden\b'],
         }
     
     def _initialize_extractors(self) -> Dict[DocumentType, Any]:
-        """Initialize format-specific extractors."""
         extractors = {}
         
         if HAS_PDFPLUMBER:
@@ -235,7 +202,6 @@ class MetadataExtractor:
         else:
             logger.warning("ebooklib not installed. EPUB metadata extraction disabled.")
         
-        # Always available extractors
         extractors[DocumentType.TXT] = self._extract_txt_metadata
         extractors[DocumentType.MD] = self._extract_md_metadata
         extractors[DocumentType.HTML] = self._extract_html_metadata
@@ -249,68 +215,48 @@ class MetadataExtractor:
         return extractors
     
     def extract_metadata(self, file_path: Union[str, Path]) -> DocumentMetadata:
-        """
-        Extract metadata from a document file.
-        
-        Args:
-            file_path: Path to the document file.
-            
-        Returns:
-            DocumentMetadata object with extracted metadata.
-            
-        Raises:
-            FileNotFoundError: If file does not exist.
-            ValueError: If file type is not supported.
-        """
         file_path = Path(file_path)
         
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         
-        # Get basic file metadata
         file_stats = file_path.stat()
         file_type = self._detect_file_type(file_path)
         
-        # Create base metadata object
         metadata = DocumentMetadata(
-            file_path=str(file_path),
-            file_name=file_path.name,
-            file_type=file_type.value,
-            file_size=file_stats.st_size,
-            created_date=datetime.fromtimestamp(file_stats.st_ctime),
-            modified_date=datetime.fromtimestamp(file_stats.st_mtime),
+            core_file_path=str(file_path),
+            core_file_name=file_path.name,
+            core_file_type=file_type.value,
+            core_file_size=file_stats.st_size,
+            technical_created_date=datetime.fromtimestamp(file_stats.st_ctime),
+            technical_modified_date=datetime.fromtimestamp(file_stats.st_mtime),
         )
         
         try:
-            # Use format-specific extractor if available
             if file_type in self.extractors:
                 extractor = self.extractors[file_type]
                 format_metadata = extractor(file_path)
                 
-                # Merge extracted metadata
                 for key, value in format_metadata.items():
                     if value is not None and value != "":
-                        if hasattr(metadata, key):
-                            setattr(metadata, key, value)
+                        prefixed_key = f"content_{key}" if key in ['title', 'author', 'date', 'publisher', 
+                                                                   'language', 'abstract', 'keywords', 'categories'] else key
+                        if hasattr(metadata, prefixed_key):
+                            setattr(metadata, prefixed_key, value)
                         else:
                             metadata.custom_fields[key] = value
             
-            # Apply fallback extraction for missing fields
             self._apply_fallback_extraction(file_path, metadata)
             
-            # Calculate word count if not already done
-            if metadata.word_count == 0:
-                metadata.word_count = self._count_words_in_file(file_path)
+            if metadata.processing_word_count == 0:
+                metadata.processing_word_count = self._count_words_in_file(file_path)
             
-            # Detect language if not specified
-            if not metadata.language:
-                metadata.language = self._detect_language(file_path)
+            if not metadata.content_language:
+                metadata.content_language = self._detect_language(file_path)
             
-            # Generate keywords if empty
-            if not metadata.keywords:
-                metadata.keywords = self._extract_keywords(file_path, metadata.title)
+            if not metadata.content_keywords:
+                metadata.content_keywords = self._extract_keywords(file_path, metadata.content_title)
             
-            # Set processing status
             metadata.processing_status = "completed"
             
         except Exception as e:
@@ -321,7 +267,6 @@ class MetadataExtractor:
         return metadata
     
     def _detect_file_type(self, file_path: Path) -> DocumentType:
-        """Detect document type from file extension."""
         extension = file_path.suffix.lower()
         
         type_mapping = {
@@ -355,16 +300,13 @@ class MetadataExtractor:
         return type_mapping.get(extension, DocumentType.UNKNOWN)
     
     def _extract_pdf_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from PDF files."""
         metadata = {}
         
         try:
             with pdfplumber.open(file_path) as pdf:
-                # Extract PDF info metadata
                 if pdf.metadata:
                     pdf_info = pdf.metadata
                     
-                    # Map PDF metadata fields to our schema
                     field_mapping = {
                         'Title': 'title',
                         'Author': 'author',
@@ -380,7 +322,6 @@ class MetadataExtractor:
                         if pdf_field in pdf_info and pdf_info[pdf_field]:
                             value = pdf_info[pdf_field]
                             
-                            # Parse dates
                             if 'Date' in pdf_field and isinstance(value, str):
                                 try:
                                     value = self._parse_pdf_date(value)
@@ -389,16 +330,13 @@ class MetadataExtractor:
                             
                             metadata[our_field] = value
                 
-                # Extract page count
                 metadata['page_count'] = len(pdf.pages)
                 
-                # Try to extract title from first page if not in metadata
                 if 'title' not in metadata or not metadata['title']:
                     if pdf.pages:
                         first_page = pdf.pages[0]
                         text = first_page.extract_text()
                         if text:
-                            # Look for title-like text (first line or centered text)
                             lines = text.split('\n')
                             if lines:
                                 potential_title = lines[0].strip()
@@ -411,9 +349,7 @@ class MetadataExtractor:
         return metadata
     
     def _parse_pdf_date(self, pdf_date: str) -> Optional[datetime]:
-        """Parse PDF date string to datetime."""
         try:
-            # PDF dates format: D:YYYYMMDDHHmmSSOHH'mm'
             if pdf_date.startswith('D:'):
                 date_str = pdf_date[2:]
                 year = int(date_str[0:4])
@@ -430,13 +366,11 @@ class MetadataExtractor:
         return None
     
     def _extract_docx_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from DOCX files."""
         metadata = {}
         
         try:
             doc = DocxDocument(file_path)
             
-            # Extract core properties
             core_props = doc.core_properties
             
             if core_props.title:
@@ -446,7 +380,10 @@ class MetadataExtractor:
             if core_props.subject:
                 metadata['abstract'] = core_props.subject
             if core_props.keywords:
-                metadata['keywords'] = core_props.keywords.split(',')
+                if isinstance(core_props.keywords, list):
+                    metadata['keywords'] = ", ".join(core_props.keywords)
+                else:
+                    metadata['keywords'] = core_props.keywords
             if core_props.language:
                 metadata['language'] = core_props.language
             if core_props.created:
@@ -456,12 +393,9 @@ class MetadataExtractor:
             if core_props.last_modified_by:
                 metadata['software'] = f"Microsoft Word ({core_props.last_modified_by})"
             
-            # Extract page count (approximate)
             metadata['page_count'] = len(doc.element.xpath('//w:pgSz'))
             
-            # Try to extract title from document if not in properties
             if 'title' not in metadata or not metadata['title']:
-                # Look for heading 1 or large text at beginning
                 for paragraph in doc.paragraphs[:10]:
                     if paragraph.text and len(paragraph.text) < 200:
                         if paragraph.style.name.startswith('Heading') or self._looks_like_title(paragraph.text):
@@ -474,16 +408,13 @@ class MetadataExtractor:
         return metadata
     
     def _extract_epub_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from EPUB files."""
         metadata = {}
         
         try:
             book = epub.read_epub(file_path)
             
-            # Extract Dublin Core metadata
             dc_metadata = book.get_metadata('DC', {})
             
-            # Map Dublin Core fields
             dc_mapping = {
                 'title': 'title',
                 'creator': 'author',
@@ -491,7 +422,7 @@ class MetadataExtractor:
                 'publisher': 'publisher',
                 'date': 'date',
                 'language': 'language',
-                'identifier': 'isbn',  # Might be ISBN
+                'identifier': 'isbn',
                 'subject': 'keywords',
             }
             
@@ -499,12 +430,14 @@ class MetadataExtractor:
                 if dc_field in dc_metadata:
                     values = dc_metadata[dc_field]
                     if values:
-                        if our_field in ['keywords', 'categories']:
-                            metadata[our_field] = values
+                        if our_field == 'keywords':
+                            if isinstance(values, list):
+                                metadata[our_field] = ", ".join(str(v) for v in values)
+                            else:
+                                metadata[our_field] = str(values)
                         else:
-                            metadata[our_field] = values[0]
+                            metadata[our_field] = values[0] if isinstance(values, list) else values
             
-            # Extract page count from spine
             metadata['page_count'] = len(book.spine)
             
         except Exception as e:
@@ -513,25 +446,30 @@ class MetadataExtractor:
         return metadata
     
     def _extract_txt_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from plain text files."""
         metadata = {}
         
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read(5000)  # Read first 5000 chars for metadata extraction
+                content = f.read(5000)
                 
-                # Look for metadata patterns
                 for field, patterns in self.patterns.items():
                     for pattern in patterns:
                         matches = re.findall(pattern, content, re.IGNORECASE | re.MULTILINE)
                         if matches:
-                            if field == 'keywords' or field == 'categories':
-                                metadata[field] = list(set(matches))
+                            if field == 'keywords':
+                                if isinstance(matches, list):
+                                    metadata[field] = ", ".join(str(m) for m in list(set(matches))[:10])
+                                else:
+                                    metadata[field] = str(matches)
+                            elif field == 'categories':
+                                if isinstance(matches, list):
+                                    metadata[field] = ", ".join(str(m) for m in list(set(matches))[:5])
+                                else:
+                                    metadata[field] = str(matches)
                             else:
                                 metadata[field] = matches[0]
                             break
                 
-                # Try to extract title from first few lines
                 if 'title' not in metadata:
                     lines = content.split('\n')
                     for i, line in enumerate(lines[:10]):
@@ -546,25 +484,28 @@ class MetadataExtractor:
         return metadata
     
     def _extract_md_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from Markdown files."""
         metadata = {}
         
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Try frontmatter extraction if available
             if HAS_FRONTMATTER:
                 try:
                     post = frontmatter.loads(content)
                     if post.metadata:
                         for key, value in post.metadata.items():
                             if key in ['title', 'author', 'date', 'categories', 'tags', 'keywords']:
-                                metadata[key] = value
+                                if key in ['categories', 'tags', 'keywords']:
+                                    if isinstance(value, list):
+                                        metadata[key] = ", ".join(str(v) for v in value)
+                                    else:
+                                        metadata[key] = str(value)
+                                else:
+                                    metadata[key] = value
                 except Exception:
                     pass
             
-            # Fallback: Look for YAML frontmatter
             if not metadata and content.startswith('---'):
                 yaml_end = content.find('---', 3)
                 if yaml_end != -1:
@@ -575,11 +516,16 @@ class MetadataExtractor:
                             if yaml_metadata:
                                 for key, value in yaml_metadata.items():
                                     if key in ['title', 'author', 'date', 'categories', 'tags', 'keywords']:
-                                        metadata[key] = value
+                                        if key in ['categories', 'tags', 'keywords']:
+                                            if isinstance(value, list):
+                                                metadata[key] = ", ".join(str(v) for v in value)
+                                            else:
+                                                metadata[key] = str(value)
+                                        else:
+                                            metadata[key] = value
                         except yaml.YAMLError:
                             pass
             
-            # Extract title from first heading
             if 'title' not in metadata:
                 heading_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
                 if heading_match:
@@ -591,14 +537,12 @@ class MetadataExtractor:
         return metadata
     
     def _extract_html_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from HTML files."""
         metadata = {}
         
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
             
-            # Extract from meta tags
             meta_patterns = {
                 'title': r'<title>(.+?)</title>',
                 'description': r'<meta\s+name=["\']description["\']\s+content=["\'](.+?)["\']',
@@ -613,17 +557,15 @@ class MetadataExtractor:
                 if match:
                     value = match.group(1).strip()
                     if field == 'keywords':
-                        metadata['keywords'] = [k.strip() for k in value.split(',')]
+                        metadata['keywords'] = ", ".join(k.strip() for k in value.split(','))
                     elif field == 'og:title' and 'title' not in metadata:
                         metadata['title'] = value
                     elif field != 'og:title':
                         metadata[field] = value
             
-            # Try to extract from h1 if title not found
             if 'title' not in metadata:
                 h1_match = re.search(r'<h1[^>]*>(.+?)</h1>', content, re.IGNORECASE)
                 if h1_match:
-                    # Remove HTML tags from h1 content
                     h1_text = re.sub(r'<[^>]+>', '', h1_match.group(1)).strip()
                     if h1_text:
                         metadata['title'] = h1_text
@@ -634,14 +576,12 @@ class MetadataExtractor:
         return metadata
     
     def _extract_json_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from JSON files."""
         metadata = {}
         
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Common JSON metadata field names
             common_fields = {
                 'title': ['title', 'name', 'headline', 'subject'],
                 'author': ['author', 'creator', 'by', 'writer'],
@@ -651,14 +591,12 @@ class MetadataExtractor:
             }
             
             def find_in_dict(data_dict, field_names):
-                """Recursively find field in dictionary."""
                 if isinstance(data_dict, dict):
                     for field in field_names:
                         if field in data_dict:
                             value = data_dict[field]
                             if value:
                                 return value
-                    # Recursively search nested dictionaries
                     for value in data_dict.values():
                         if isinstance(value, dict):
                             result = find_in_dict(value, field_names)
@@ -669,7 +607,10 @@ class MetadataExtractor:
             for metadata_field, json_fields in common_fields.items():
                 value = find_in_dict(data, json_fields)
                 if value:
-                    metadata[metadata_field] = value
+                    if metadata_field == 'keywords' and isinstance(value, list):
+                        metadata[metadata_field] = ", ".join(str(v) for v in value[:10])
+                    else:
+                        metadata[metadata_field] = value
             
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             logger.warning(f"Error parsing JSON metadata from {file_path}: {e}")
@@ -679,7 +620,6 @@ class MetadataExtractor:
         return metadata
     
     def _extract_yaml_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from YAML files."""
         metadata = {}
         
         if not HAS_YAML:
@@ -690,7 +630,6 @@ class MetadataExtractor:
                 data = yaml.safe_load(f)
             
             if isinstance(data, dict):
-                # Common YAML metadata field names
                 common_fields = {
                     'title': ['title', 'name', 'Title', 'Name'],
                     'author': ['author', 'Author', 'by', 'By'],
@@ -704,10 +643,11 @@ class MetadataExtractor:
                         if field in data:
                             value = data[field]
                             if value:
-                                if metadata_field == 'tags' and isinstance(value, list):
-                                    metadata['keywords'] = value
-                                elif metadata_field == 'tags' and isinstance(value, str):
-                                    metadata['keywords'] = [tag.strip() for tag in value.split(',')]
+                                if metadata_field == 'tags':
+                                    if isinstance(value, list):
+                                        metadata['keywords'] = ", ".join(str(v) for v in value)
+                                    elif isinstance(value, str):
+                                        metadata['keywords'] = value
                                 else:
                                     metadata[metadata_field] = value
                                 break
@@ -720,12 +660,10 @@ class MetadataExtractor:
         return metadata
     
     def _extract_csv_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from CSV files."""
         metadata = {}
         
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                # Read first few lines to get column names
                 lines = []
                 for i in range(5):
                     line = f.readline()
@@ -734,13 +672,11 @@ class MetadataExtractor:
                     lines.append(line)
                 
                 if lines:
-                    # Try to detect column names (usually first line)
                     first_line = lines[0].strip()
                     if first_line:
-                        # Simple check: if first line looks like column headers
                         columns = first_line.split(',')
                         if len(columns) > 1 and all(col.strip() for col in columns):
-                            metadata['columns'] = [col.strip() for col in columns]
+                            metadata['columns'] = ", ".join(col.strip() for col in columns)
                             metadata['row_count_estimate'] = sum(1 for _ in open(file_path)) - 1
         except Exception as e:
             logger.warning(f"Error extracting CSV metadata from {file_path}: {e}")
@@ -748,7 +684,6 @@ class MetadataExtractor:
         return metadata
     
     def _extract_pptx_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from PowerPoint files."""
         metadata = {}
         
         try:
@@ -756,10 +691,8 @@ class MetadataExtractor:
             
             prs = Presentation(file_path)
             
-            # Extract slide count
             metadata['page_count'] = len(prs.slides)
             
-            # Try to extract title from first slide
             if prs.slides:
                 first_slide = prs.slides[0]
                 for shape in first_slide.shapes:
@@ -777,23 +710,19 @@ class MetadataExtractor:
         return metadata
     
     def _extract_xlsx_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from Excel files."""
         metadata = {}
         
         try:
             import pandas as pd
             
-            # Read Excel file properties
             excel_file = pd.ExcelFile(file_path)
             
-            # Extract sheet names
-            metadata['sheets'] = excel_file.sheet_names
+            metadata['sheets'] = ", ".join(excel_file.sheet_names)
             
-            # Try to get basic info from first sheet
             try:
                 df = pd.read_excel(file_path, sheet_name=0, nrows=5)
-                metadata['columns'] = df.columns.tolist()
-                metadata['row_count_estimate'] = sum(1 for _ in open(file_path, 'rb')) // 100  # Rough estimate
+                metadata['columns'] = ", ".join(str(col) for col in df.columns.tolist())
+                metadata['row_count_estimate'] = sum(1 for _ in open(file_path, 'rb')) // 100
             except:
                 pass
             
@@ -805,7 +734,6 @@ class MetadataExtractor:
         return metadata
     
     def _extract_image_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Extract metadata from image files."""
         metadata = {}
         
         try:
@@ -813,13 +741,11 @@ class MetadataExtractor:
             import PIL.ExifTags
             
             with Image.open(file_path) as img:
-                # Basic image info
                 metadata['width'] = img.width
                 metadata['height'] = img.height
                 metadata['format'] = img.format
                 metadata['mode'] = img.mode
                 
-                # Try to extract EXIF data
                 if hasattr(img, '_getexif') and img._getexif():
                     exif = img._getexif()
                     exif_tags = {
@@ -827,7 +753,6 @@ class MetadataExtractor:
                         for tag, value in exif.items()
                     }
                     
-                    # Map common EXIF tags
                     exif_mapping = {
                         'DateTime': 'created_date',
                         'Artist': 'author',
@@ -849,41 +774,32 @@ class MetadataExtractor:
         return metadata
     
     def _apply_fallback_extraction(self, file_path: Path, metadata: DocumentMetadata):
-        """Apply fallback extraction methods for missing metadata."""
         try:
-            # Read file content for pattern matching
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read(10000)  # Read first 10k chars
+                content = f.read(10000)
             
-            # Extract title if missing
-            if not metadata.title:
-                metadata.title = self._extract_title_from_content(content)
+            if not metadata.content_title:
+                metadata.content_title = self._extract_title_from_content(content)
             
-            # Extract author if missing
-            if not metadata.author:
-                metadata.author = self._extract_author_from_content(content)
+            if not metadata.content_author:
+                metadata.content_author = self._extract_author_from_content(content)
             
-            # Extract date if missing
-            if not metadata.date:
-                metadata.date = self._extract_date_from_content(content)
+            if not metadata.content_date:
+                metadata.content_date = self._extract_date_from_content(content)
             
-            # Extract additional metadata
             self._extract_additional_metadata(content, metadata)
             
         except Exception as e:
             logger.warning(f"Error in fallback extraction for {file_path}: {e}")
     
     def _extract_title_from_content(self, content: str) -> Optional[str]:
-        """Extract title from content using various heuristics."""
         lines = content.split('\n')
         
-        # Strategy 1: First non-empty line that looks like a title
-        for line in lines[:20]:  # Check first 20 lines
+        for line in lines[:20]:
             line = line.strip()
             if line and self._looks_like_title(line):
                 return line
         
-        # Strategy 2: Longest line in first 50 lines (often the title)
         first_lines = lines[:50]
         if first_lines:
             non_empty_lines = [line.strip() for line in first_lines if line.strip()]
@@ -893,39 +809,31 @@ class MetadataExtractor:
         return None
     
     def _looks_like_title(self, text: str) -> bool:
-        """Determine if text looks like a title."""
         if not text or len(text) > 200:
             return False
         
-        # Check for common title characteristics
         words = text.split()
         
-        # Too few words
         if len(words) < 2:
             return False
         
-        # Check capitalization (titles often have major words capitalized)
         capitalized_words = sum(1 for word in words if word and word[0].isupper())
-        capitalization_ratio = capitalized_words / len(words)
+        capitalization_ratio = capitalized_words / len(words) if words else 0
         
-        # Check for common non-title patterns
         non_title_patterns = [
-            r'^\d+\.',  # Numbered list
-            r'^[A-Za-z]\)',  # Letter list
-            r'^\s*$',  # Empty
-            r'^[\-\*\+]\s',  # Bullet point
+            r'^\d+\.',
+            r'^[A-Za-z]\)',
+            r'^\s*$',
+            r'^[\-\*\+]\s',
         ]
         
         for pattern in non_title_patterns:
             if re.match(pattern, text):
                 return False
         
-        # Titles typically have moderate capitalization
         return 0.3 < capitalization_ratio < 0.9
     
     def _extract_author_from_content(self, content: str) -> Optional[str]:
-        """Extract author from content."""
-        # Look for author patterns
         author_patterns = [
             r'by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})',
             r'Author[:\s]+([^\n]+)',
@@ -938,13 +846,12 @@ class MetadataExtractor:
             match = re.search(pattern, content, re.IGNORECASE)
             if match:
                 author = match.group(1).strip()
-                if len(author.split()) <= 4:  # Reasonable name length
+                if len(author.split()) <= 4:
                     return author
         
         return None
     
     def _extract_date_from_content(self, content: str) -> Optional[datetime]:
-        """Extract date from content."""
         date_patterns = [
             r'\b\d{4}-\d{2}-\d{2}\b',
             r'\b\d{2}/\d{2}/\d{4}\b',
@@ -957,7 +864,6 @@ class MetadataExtractor:
             if matches:
                 for match in matches:
                     try:
-                        # Try different date formats
                         for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%B %d, %Y', '%b %d, %Y', '%Y']:
                             try:
                                 return datetime.strptime(match, fmt)
@@ -969,29 +875,23 @@ class MetadataExtractor:
         return None
     
     def _extract_additional_metadata(self, content: str, metadata: DocumentMetadata):
-        """Extract additional metadata fields from content."""
-        # Extract emails
         email_matches = re.findall(self.patterns['email'][0], content)
         if email_matches:
-            metadata.custom_fields['emails'] = list(set(email_matches))
+            metadata.custom_fields['emails'] = ", ".join(list(set(email_matches))[:5])
         
-        # Extract URLs
         url_matches = re.findall(self.patterns['url'][0], content)
         if url_matches:
-            metadata.custom_fields['urls'] = list(set(url_matches))
+            metadata.custom_fields['urls'] = ", ".join(list(set(url_matches))[:5])
         
-        # Extract ISBN if present
         isbn_matches = re.findall(self.patterns['isbn'][0], content)
         if isbn_matches:
             metadata.custom_fields['isbn'] = isbn_matches[0]
         
-        # Extract DOI if present
         doi_matches = re.findall(self.patterns['doi'][0], content, re.IGNORECASE)
         if doi_matches:
             metadata.custom_fields['doi'] = doi_matches[0]
     
     def _count_words_in_file(self, file_path: Path) -> int:
-        """Count words in a file."""
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
@@ -1001,12 +901,10 @@ class MetadataExtractor:
             return 0
     
     def _detect_language(self, file_path: Path) -> str:
-        """Detect language of document content."""
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read(5000)  # Sample first 5000 chars
+                content = f.read(5000)
                 
-                # Count matches for each language
                 language_scores = {}
                 for lang, patterns in self.language_patterns.items():
                     score = 0
@@ -1015,78 +913,57 @@ class MetadataExtractor:
                         score += len(matches)
                     language_scores[lang] = score
                 
-                # Return language with highest score
                 if language_scores:
                     max_lang = max(language_scores.items(), key=lambda x: x[1])
-                    if max_lang[1] > 0:  # Only return if we found matches
+                    if max_lang[1] > 0:
                         return max_lang[0]
                 
         except Exception:
             pass
         
-        return 'en'  # Default to English
+        return 'en'
     
-    def _extract_keywords(self, file_path: Path, title: Optional[str] = None) -> List[str]:
-        """Extract keywords from document content."""
+    def _extract_keywords(self, file_path: Path, title: Optional[str] = None) -> str:
         keywords = set()
         
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read(10000)  # Sample first 10000 chars
+                content = f.read(10000)
             
-            # Add words from title
             if title:
                 title_words = re.findall(r'\b[A-Za-z]{4,}\b', title)
-                keywords.update(title_words)
+                keywords.update(w.lower() for w in title_words)
             
-            # Extract capitalized phrases (potential proper nouns/terms)
             capitalized_phrases = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b', content)
             keywords.update(phrase.lower() for phrase in capitalized_phrases[:10])
             
-            # Extract words that appear multiple times (potential keywords)
             words = re.findall(r'\b[a-z]{4,}\b', content.lower())
             word_freq = {}
             for word in words:
                 word_freq[word] = word_freq.get(word, 0) + 1
             
-            # Add frequent words (excluding common stopwords)
-            common_words = {'the', 'and', 'that', 'for', 'with', 'this', 'have', 'from', 'they', 'which'}
-            for word, freq in sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:20]:
+            common_words = {'the', 'and', 'that', 'for', 'with', 'this', 'have', 'from', 'they', 'which',
+                           'what', 'when', 'where', 'who', 'why', 'how', 'all', 'any', 'both', 'each',
+                           'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only',
+                           'own', 'same', 'so', 'than', 'too', 'very', 'just', 'now'}
+            
+            for word, freq in sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:30]:
                 if freq >= 3 and word not in common_words:
                     keywords.add(word)
             
         except Exception:
             pass
         
-        return list(keywords)[:10]  # Return top 10 keywords
+        keyword_list = list(keywords)[:10]
+        return ", ".join(keyword_list)
 
-# ========== CONVENIENCE FUNCTIONS ==========
 
 def extract_metadata(file_path: Union[str, Path], config: Optional[Dict] = None) -> DocumentMetadata:
-    """
-    Convenience function for one-off metadata extraction.
-    
-    Args:
-        file_path: Path to the document file.
-        config: Optional extractor configuration.
-        
-    Returns:
-        DocumentMetadata object.
-    """
     extractor = MetadataExtractor(config)
     return extractor.extract_metadata(file_path)
 
+
 def batch_extract_metadata(file_paths: List[Union[str, Path]], config: Optional[Dict] = None) -> List[DocumentMetadata]:
-    """
-    Extract metadata from multiple files.
-    
-    Args:
-        file_paths: List of file paths.
-        config: Optional extractor configuration.
-        
-    Returns:
-        List of DocumentMetadata objects.
-    """
     extractor = MetadataExtractor(config)
     results = []
     
@@ -1099,24 +976,21 @@ def batch_extract_metadata(file_paths: List[Union[str, Path]], config: Optional[
     
     return results
 
+
 def metadata_to_json(metadata: DocumentMetadata, indent: int = 2) -> str:
-    """Convert metadata to JSON string."""
     return metadata.to_json()
 
+
 def metadata_from_json(json_str: str) -> DocumentMetadata:
-    """Create metadata from JSON string."""
     data = json.loads(json_str)
     return DocumentMetadata.from_dict(data)
 
-# ========== TESTING AND VALIDATION ==========
 
 def test_metadata_extraction() -> Dict[str, bool]:
-    """Test metadata extraction with sample files."""
     import tempfile
     
     test_results = {}
     
-    # Create test files
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
         f.write("""Test Document Title
 
@@ -1130,19 +1004,17 @@ It contains some sample content for testing purposes.
 Keywords: testing, metadata, extraction, python""")
         txt_file = f.name
     
-    # Test TXT extraction
     try:
         metadata = extract_metadata(txt_file)
         test_results['txt_extraction'] = (
-            metadata.title == "Test Document Title" and
-            metadata.author == "John Doe" and
-            metadata.file_type == "txt"
+            metadata.content_title == "Test Document Title" and
+            metadata.content_author == "John Doe" and
+            metadata.core_file_type == "txt"
         )
     except Exception as e:
         test_results['txt_extraction'] = False
         logger.error(f"TXT extraction test failed: {e}")
     
-    # Clean up
     try:
         os.unlink(txt_file)
     except:
@@ -1150,7 +1022,6 @@ Keywords: testing, metadata, extraction, python""")
     
     return test_results
 
-# ========== MAIN MODULE EXECUTION ==========
 
 if __name__ == "__main__":
     import argparse
@@ -1201,24 +1072,24 @@ if __name__ == "__main__":
                     print("YAML output requires PyYAML. Install with: pip install pyyaml")
             else:
                 print("\n=== METADATA EXTRACTION RESULTS ===")
-                print(f"File: {metadata.file_name}")
-                print(f"Type: {metadata.file_type}")
-                print(f"Size: {metadata.file_size:,} bytes")
+                print(f"File: {metadata.core_file_name}")
+                print(f"Type: {metadata.core_file_type}")
+                print(f"Size: {metadata.core_file_size:,} bytes")
                 
-                if metadata.title:
-                    print(f"Title: {metadata.title}")
-                if metadata.author:
-                    print(f"Author: {metadata.author}")
-                if metadata.date:
-                    print(f"Date: {metadata.date}")
-                if metadata.language:
-                    print(f"Language: {metadata.language}")
-                if metadata.keywords:
-                    print(f"Keywords: {', '.join(metadata.keywords)}")
-                if metadata.word_count:
-                    print(f"Word Count: {metadata.word_count:,}")
-                if metadata.page_count:
-                    print(f"Page Count: {metadata.page_count}")
+                if metadata.content_title:
+                    print(f"Title: {metadata.content_title}")
+                if metadata.content_author:
+                    print(f"Author: {metadata.content_author}")
+                if metadata.content_date:
+                    print(f"Date: {metadata.content_date}")
+                if metadata.content_language:
+                    print(f"Language: {metadata.content_language}")
+                if metadata.content_keywords:
+                    print(f"Keywords: {metadata.content_keywords}")
+                if metadata.processing_word_count:
+                    print(f"Word Count: {metadata.processing_word_count:,}")
+                if metadata.processing_page_count:
+                    print(f"Page Count: {metadata.processing_page_count}")
                 
                 print(f"Processing Status: {metadata.processing_status}")
                 if metadata.processing_error:
@@ -1239,13 +1110,12 @@ if __name__ == "__main__":
         print(f"Successfully extracted: {len(results)}")
         
         for metadata in results:
-            print(f"\n{metadata.file_name}:")
-            if metadata.title:
-                print(f"  Title: {metadata.title}")
+            print(f"\n{metadata.core_file_name}:")
+            if metadata.content_title:
+                print(f"  Title: {metadata.content_title}")
             print(f"  Status: {metadata.processing_status}")
     
     else:
-        # Show usage examples
         print("=" * 70)
         print("METADATA EXTRACTION MODULE")
         print("=" * 70)
@@ -1257,7 +1127,7 @@ if __name__ == "__main__":
         print("\nAvailable document types:")
         print("  • PDF (.pdf)")
         print("  • DOCX (.docx, .doc)")
-        print("  • TXT (.txt, .text, .rtf, .log)")
+        print("  • TXT (.txt, .text)")
         print("  • EPUB (.epub)")
         print("  • Markdown (.md, .markdown)")
         print("  • HTML (.html, .htm)")
