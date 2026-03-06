@@ -1,14 +1,12 @@
-# cockatoo_v1/src/vector_store/chroma_client.py
+# src/vector_store/chroma_client.py
 
-"""
-ChromaDB Vector Store Client for cockatoo_v1.
-Provides CRUD operations and search capabilities for vector embeddings.
-"""
+"""ChromaDB vector store client for document storage and retrieval."""
 
 import os
 import logging
 import uuid
 import sys
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
@@ -65,106 +63,123 @@ class ChromaClient:
         self.collection = self._get_or_create_collection()
         logger.info(f"ChromaDB client initialized: {self.persist_directory}")
 
-    def _get_or_create_collection(self) -> chromadb.Collection:
-        """Retrieve existing collection or create a new one."""
-        try:
-            collection = self.client.get_collection(name=self.collection_name)
-            logger.debug(f"Using existing collection: {self.collection_name}")
-            return collection
-        except ValueError:
-            collection = self.client.create_collection(
-                name=self.collection_name,
-                metadata={
-                    "description": "cockatoo_v1 document embeddings",
-                    "created_at": datetime.now().isoformat(),
-                    "created_by": "ChromaClient"
-                }
-            )
-            logger.info(f"Created new collection: {self.collection_name}")
-            return collection
+    def __getattr__(self, name):
+        """Fallback for compatibility with different method names."""
+        if name == 'search':
+            return self._search_compat
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
-    def add_documents(
-        self,
-        texts: List[str],
-        embeddings: Optional[List[List[float]]] = None,
-        metadatas: Optional[List[Dict[str, Any]]] = None,
-        ids: Optional[List[str]] = None
-    ) -> List[str]:
-        """Add documents to the vector store."""
-        if not texts:
-            return []
+    def _search_compat(self, query: str, **kwargs):
+        """Compatibility method that handles various parameters."""
+        logger.debug(f"Compatibility search called with kwargs: {kwargs}")
+        
+        n_results = kwargs.pop('top_k', kwargs.pop('n_results', self.default_top_k))
+        where = kwargs.get('where')
+        where_document = kwargs.get('where_document')
+        include = kwargs.get('include', ["documents", "metadatas", "distances"])
+        
+        return self._execute_search(
+            query=query,
+            n_results=n_results,
+            where=where,
+            where_document=where_document,
+            include=include
+        )
 
-        if ids is None:
-            ids = [str(uuid.uuid4()) for _ in range(len(texts))]
+    def search(self, query: str, **kwargs) -> Dict[str, Any]:
+        """Unified search method that handles both n_results and top_k."""
+        n_results = kwargs.get('n_results', kwargs.get('top_k', self.default_top_k))
+        where = kwargs.get('where')
+        where_document = kwargs.get('where_document')
+        include = kwargs.get('include', ["documents", "metadatas", "distances"])
+        
+        return self._execute_search(
+            query=query,
+            n_results=n_results,
+            where=where,
+            where_document=where_document,
+            include=include
+        )
 
-        if metadatas is None:
-            metadatas = [{} for _ in range(len(texts))]
-
-        if len(metadatas) != len(texts):
-            raise ValueError(f"Metadatas length ({len(metadatas)}) must match texts length ({len(texts)})")
-
-        if embeddings is not None and len(embeddings) != len(texts):
-            raise ValueError(f"Embeddings length ({len(embeddings)}) must match texts length ({len(texts)})")
-
-        timestamp = datetime.now().isoformat()
-        for i, metadata in enumerate(metadatas):
-            metadata["added_at"] = metadata.get("added_at", timestamp)
-            
-            if hasattr(texts[i], 'text'):  
-                doc_length = len(texts[i].text)
-            else: 
-                doc_length = len(texts[i])
-            
-            metadata["doc_length"] = metadata.get("doc_length", doc_length)
-
-        try:
-            if embeddings:
-                self.collection.add(embeddings=embeddings, documents=texts, metadatas=metadatas, ids=ids)
-            else:
-                self.collection.add(documents=texts, metadatas=metadatas, ids=ids)
-
-            logger.info(f"Added {len(texts)} documents to collection '{self.collection_name}'")
-            return ids
-        except Exception as error:
-            logger.error(f"Failed to add documents: {error}")
-            raise RuntimeError(f"Document addition failed: {error}")
-
-    def search(
-        self,
-        query: str,
-        n_results: int = 5,
-        where: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None,
-        include: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
-        """Search for similar documents using a text query."""
+    def _execute_search(self, query, n_results: int = 5,
+                        where: Optional[Dict[str, Any]] = None,
+                        where_document: Optional[Dict[str, Any]] = None,
+                        include: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Core search execution logic with improved error handling."""
+        
         if include is None:
             include = ["documents", "metadatas", "distances"]
 
-        if not query or not query.strip():
-            return self._empty_search_result("Empty query")
+        if isinstance(query, np.ndarray):
+            try:
+                count = self.collection.count()
+                if count == 0:
+                    logger.warning("Collection is empty, no results to return")
+                    return self._empty_search_result("Collection is empty")
 
-        try:
-            count = self.collection.count()
-            if count == 0:
-                logger.warning("Collection is empty, no results to return")
-                return self._empty_search_result("Collection is empty")
+                if n_results > count:
+                    logger.debug(f"Adjusting n_results from {n_results} to {count} (collection size)")
+                    n_results = count
 
-            if n_results > count:
-                logger.debug(f"Adjusting n_results from {n_results} to {count} (collection size)")
-                n_results = count
+                query_embeddings = [query.tolist()]
+                
+                results = self.collection.query(
+                    query_embeddings=query_embeddings,
+                    n_results=n_results,
+                    where=where,
+                    where_document=where_document,
+                    include=include
+                )
+                return self._format_search_results(results)
+            except Exception as error:
+                logger.error(f"Embedding search failed: {error}")
+                return self._empty_search_result(str(error))
+        
+        elif isinstance(query, str):
+            if not query or not query.strip():
+                return self._empty_search_result("Empty query")
+            
+            try:
+                count = self.collection.count()
+                if count == 0:
+                    logger.warning("Collection is empty, no results to return")
+                    return self._empty_search_result("Collection is empty")
 
-            results = self.collection.query(
-                query_texts=[query.strip()],
-                n_results=n_results,
-                where=where,
-                where_document=where_document,
-                include=include
-            )
-            return self._format_search_results(results)
-        except Exception as error:
-            logger.error(f"Search failed: {error}")
-            return self._empty_search_result(str(error))
+                if n_results > count:
+                    logger.debug(f"Adjusting n_results from {n_results} to {count} (collection size)")
+                    n_results = count
+
+                logger.debug(f"Searching with query: '{query[:50]}...', n_results={n_results}, where={where}")
+                
+                results = self.collection.query(
+                    query_texts=[query.strip()],
+                    n_results=n_results,
+                    where=where,
+                    where_document=where_document,
+                    include=include
+                )
+                
+                formatted_results = self._format_search_results(results)
+                
+                if formatted_results['count'] == 0:
+                    logger.warning(f"No results found for query: '{query[:50]}...'")
+                    
+                    try:
+                        sample = self.peek(1)
+                        if sample:
+                            logger.info(f"Collection has data. Sample: {sample[0].get('document', '')[:100]}...")
+                    except Exception as e:
+                        logger.warning(f"Failed to peek collection: {e}")
+                
+                return formatted_results
+                
+            except Exception as error:
+                logger.error(f"Search failed: {error}")
+                return self._empty_search_result(str(error))
+        
+        else:
+            logger.error(f"Unsupported query type: {type(query)}")
+            return self._empty_search_result(f"Unsupported query type: {type(query)}")
 
     def search_with_embeddings(
         self,
@@ -264,6 +279,84 @@ class ChromaClient:
 
         return results
 
+    def _get_or_create_collection(self) -> chromadb.Collection:
+        """Retrieve existing collection or create a new one."""
+        try:
+            collection = self.client.get_collection(name=self.collection_name)
+            logger.debug(f"Using existing collection: {self.collection_name}")
+            return collection
+        except ValueError:
+            collection = self.client.create_collection(
+                name=self.collection_name,
+                metadata={
+                    "description": "cockatoo_v1 document embeddings",
+                    "created_at": datetime.now().isoformat(),
+                    "created_by": "ChromaClient"
+                }
+            )
+            logger.info(f"Created new collection: {self.collection_name}")
+            return collection
+
+    def add_documents(
+        self,
+        texts: List[str],
+        embeddings: Optional[List[List[float]]] = None,
+        metadatas: Optional[List[Dict[str, Any]]] = None,
+        ids: Optional[List[str]] = None
+    ) -> List[str]:
+        """Add documents to the vector store."""
+        if not texts:
+            return []
+
+        if ids is None:
+            ids = [str(uuid.uuid4()) for _ in range(len(texts))]
+
+        if metadatas is None:
+            metadatas = [{} for _ in range(len(texts))]
+
+        if len(metadatas) != len(texts):
+            raise ValueError(f"Metadatas length ({len(metadatas)}) must match texts length ({len(texts)})")
+
+        if embeddings is not None and len(embeddings) != len(texts):
+            raise ValueError(f"Embeddings length ({len(embeddings)}) must match texts length ({len(texts)})")
+
+        validated_metadatas = []
+        for metadata in metadatas:
+            validated = {}
+            for key, value in metadata.items():
+                if value is None:
+                    validated[key] = ""
+                elif isinstance(value, (str, int, float, bool)):
+                    validated[key] = value
+                elif isinstance(value, (list, dict)):
+                    validated[key] = json.dumps(value)
+                else:
+                    validated[key] = str(value)
+            validated_metadatas.append(validated)
+
+        timestamp = datetime.now().isoformat()
+        for i, metadata in enumerate(validated_metadatas):
+            metadata["added_at"] = metadata.get("added_at", timestamp)
+            
+            if hasattr(texts[i], 'text'):  
+                doc_length = len(texts[i].text)
+            else: 
+                doc_length = len(texts[i])
+            
+            metadata["doc_length"] = metadata.get("doc_length", doc_length)
+
+        try:
+            if embeddings:
+                self.collection.add(embeddings=embeddings, documents=texts, metadatas=validated_metadatas, ids=ids)
+            else:
+                self.collection.add(documents=texts, metadatas=validated_metadatas, ids=ids)
+
+            logger.info(f"Added {len(texts)} documents to collection '{self.collection_name}'")
+            return ids
+        except Exception as error:
+            logger.error(f"Failed to add documents: {error}")
+            raise RuntimeError(f"Document addition failed: {error}")
+
     def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve a document by its ID."""
         try:
@@ -361,6 +454,16 @@ class ChromaClient:
             logger.error(f"Failed to peek documents: {error}")
             return []
 
+    def persist(self) -> bool:
+        """Force persist data to disk."""
+        try:
+            self.collection.count()
+            logger.info("Forced persist completed")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to persist: {e}")
+            return False
+
     def update_document(
         self,
         doc_id: str,
@@ -370,7 +473,6 @@ class ChromaClient:
     ) -> bool:
         """Update an existing document."""
         try:
-            # First check if document exists
             existing = self.get_document(doc_id)
             if existing is None:
                 logger.warning(f"Document not found: {doc_id}")
@@ -458,7 +560,6 @@ class ChromaClient:
     def health_check(self) -> Dict[str, Any]:
         """Perform a health check on the vector store."""
         try:
-            # Try to actually connect to the database by performing a simple operation
             self.collection.count()
             
             info = self.get_collection_info()
@@ -476,7 +577,6 @@ class ChromaClient:
                 "error": str(error),
                 "timestamp": datetime.now().isoformat()
             }
-
 
     def set_top_k(self, k: int) -> None:
         """Set the default number of results for search operations."""
